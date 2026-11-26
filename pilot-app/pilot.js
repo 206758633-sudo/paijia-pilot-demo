@@ -55,10 +55,11 @@ function toast(message) {
 }
 
 function button(label, action, kind = "", options = {}) {
-  const { disabled = false, value, pressed, type = "button" } = options;
+  const { disabled = false, value, pressed, type = "button", description } = options;
   return '<button type="' + type + '" class="btn ' + kind + '" data-action="' + action + '"' +
     (value === undefined ? "" : ' data-value="' + escapeHtml(value) + '"') +
     (pressed === undefined ? "" : ' aria-pressed="' + pressed + '"') +
+    (description ? ' aria-describedby="' + escapeHtml(description) + '"' : "") +
     (disabled ? " disabled" : "") + ">" + escapeHtml(label) + "</button>";
 }
 
@@ -72,11 +73,12 @@ function heading(title, description = "") {
 }
 
 function tile(icon, title, description, action, options = {}) {
+  const suffix = options.cta ? '<span class="tile-cta">' + escapeHtml(options.cta) + "</span>" : '<span aria-hidden="true">›</span>';
   return '<button class="card tile" type="button" data-action="' + action + '"' +
     (options.value ? ' data-value="' + escapeHtml(options.value) + '"' : "") + (options.disabled ? " disabled" : "") +
     '><span class="symbol ' + (options.tone || "") + '" aria-hidden="true">' + escapeHtml(icon) +
     '</span><span><span class="tile-title">' + escapeHtml(title) + "</span><small>" + escapeHtml(description) +
-    '</small></span><span aria-hidden="true">›</span></button>';
+    "</small></span>" + suffix + "</button>";
 }
 
 function alertMessage() {
@@ -216,7 +218,8 @@ function home() {
 }
 
 function robotCard(robot, action, details = "") {
-  return tile(robot.model, robotLabel(robot), robot.id + " · " + (details || robot.firmware + " · " + robot.battery + "%"), action, { value: robot.id });
+  const cta = action === "join-lan" ? tr("连接", "Connect") : "";
+  return tile(robot.model, robotLabel(robot), robot.id + " · " + (details || robot.firmware + " · " + robot.battery + "%"), action, { value: robot.id, cta });
 }
 
 function lanRobots() {
@@ -244,7 +247,7 @@ function connectView() {
   switch (join.step) {
     case "lan":
       title = tr("连接机器人", "Connect a robot");
-      description = tr("选择与手机处于同一网络的设备。", "Select a robot on the same network.");
+      description = tr("选择同一网络中的机器人，连接后自动进入操控台。", "Select a robot on your network. Controls open after connection.");
       content = '<div class="stack">' + lanRobots().map(robot => robotCard(robot, "join-lan")).join("") +
         button(tr("发现附近机器人", "Discover nearby robots"), "discover", "primary") + "</div>";
       back = "nav";
@@ -384,10 +387,12 @@ function control() {
   const adjustable = online && session.mode !== "damp" && !session.running && !session.dialog;
   const enabled = online && session.mode === "walk" && !session.dialog;
   const showFeed = online && session.camera;
-  const status = online ? linkLabel(session.connection.kind) : tr("已掉线", "Connection lost");
+  const status = online ? tr("已连接", "Connected") + " · " + linkLabel(session.connection.kind) : tr("已掉线", "Connection lost");
+  const nextMode = session.mode === "damp" ? "ready" : session.mode === "ready" ? "walk" : null;
   const names = stickNames();
   return '<div class="console"><header class="console-top"><div class="row">' +
     button(tr("‹ 设备", "‹ Devices"), "nav", "", { value: "home" }) +
+    '<h1 class="console-title">' + tr("机器人操控台", "Robot controls") + "</h1>" +
     button(agentLabel(getAgent()) + " ▾", "agent-picker", "", { disabled: !online }) +
     chip(robot.id) + chip(status, online ? "green" : "warm") + chip(robot.battery + "%") +
     '</div><div class="row">' +
@@ -400,11 +405,12 @@ function control() {
       '<div class="stick-slot"><button type="button" class="stick" data-stick="' + key + '" aria-label="' + name +
       '" aria-describedby="motion-output"' + ((key === "head" ? adjustable : adjustable && enabled) ? "" : " disabled") +
       '><i aria-hidden="true"></i></button><span>' + name + "</span></div>"
-    ).join("") + '</div></section><footer class="console-bottom"><div class="row">' +
-    (online ? modes.map(mode => button(modeLabel(mode), "mode", "", {
-      value: mode, pressed: selectedMode(mode), disabled: mode === "walk" && session.mode === "damp"
+    ).join("") + '</div></section><footer class="console-bottom"><div class="row mode-controls" role="group" aria-label="' + tr("机器人模式", "Robot mode") + '">' +
+    (online ? modes.map(mode => button(modeLabel(mode), "mode", mode === nextMode ? "next-mode" : "", {
+      value: mode, pressed: selectedMode(mode), disabled: mode === "walk" && session.mode === "damp",
+      description: mode === nextMode ? "action-output" : undefined
     })).join("") : button(tr("重新连接", "Reconnect"), "reconnect", "primary")) +
-    '</div><div class="action-area"><div class="row">' + activeActions().map(action =>
+    '</div><div class="action-area"><div class="row action-list" role="group" aria-label="' + tr("执行动作", "Run an action") + '">' + activeActions().map(action =>
       button(action.label, "run", "", { value: action.id, pressed: session.running?.action.id === action.id,
         disabled: !enabled || (session.running && session.running.action.id !== action.id) })
     ).join("") + (session.agent === "teach" ? button(tr("打开示教", "Open teaching"), "begin-teach") : "") +
@@ -418,8 +424,8 @@ function actionMessage() {
   if (run) return run.action.label + " · " + (run.remaining > run.action.duration ?
     tr("准备中", "Preparing") : tr("执行中", "Running") + " " + run.remaining + " s");
   if (!connected()) return tr("连接恢复后，请重新选择操作。", "Choose a new action after reconnecting.");
-  if (session.mode === "damp") return tr("先切换到准备模式，再进入行走。", "Choose Ready before Walking.");
-  if (session.mode === "ready") return tr("确认已站稳，再选择行走。", "Confirm the robot is standing before Walking.");
+  if (session.mode === "damp") return tr("点「准备」，再点「行走」启用摇杆和动作。", "Tap Ready, then Walking to enable joysticks and actions.");
+  if (session.mode === "ready") return tr("确认机器人已站稳后，点「行走」。", "Confirm the robot is standing, then tap Walking.");
   return tr("点击动作执行。", "Select an action to run.");
 }
 
