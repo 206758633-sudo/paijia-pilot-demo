@@ -7,12 +7,21 @@
   <meta name="description" content="派加 Pilot 机器人操控、Agent、示教、群控与手眼标定模拟演示。">
   <title>派加 Pilot · 机器人工作台</title>
   <link rel="stylesheet" href="./pilot-app/pilot.css">
+  <link rel="stylesheet" href="./pilot-app/device-preview.css">
   <script defer src="./pilot-app/catalog.js"></script>
-  <script defer src="./pilot-app/pilot.js"></script>
+  <script defer src="./pilot-app/pilot.js?v=28"></script>
 </head>
 <body>
-  <main id="app" tabindex="-1"></main>
-  <div id="toasts" class="toast" role="status" aria-live="polite"></div>
+  <div class="device-preview">
+    <p class="device-label">iPhone 17 <span>横屏预览</span></p>
+    <div class="device-frame">
+      <div class="device-screen">
+        <main id="app" tabindex="-1"></main>
+        <div id="toasts" class="toast" role="status" aria-live="polite"></div>
+      </div>
+      <div class="device-island" aria-hidden="true"></div>
+    </div>
+  </div>
   <noscript>请启用 JavaScript 以打开派加 Pilot 演示。</noscript>
 </body>
 </html>

@@ -111,6 +111,7 @@ function render() {
   root.innerHTML = views[session.page]();
   if (renderedPage !== session.page) {
     renderedPage = session.page;
+    root.scrollTop = 0;
     window.scrollTo(0, 0);
     root.focus({ preventScroll: true });
   } else if (session.dialog && session.dialog !== priorDialog) {
