@@ -4,7 +4,7 @@ const root = document.querySelector("#app");
 const toastBox = document.querySelector("#toasts");
 const storageKey = "paijia-pilot-workbench-v27";
 const defaults = { user: "", accounts: [], region: "CN", language: "zh", skills: [], installed: {},
-  preferences: {}, robotAgents: {}, lan: [], calibration: {}, directory: 1 };
+  preferences: {}, robotAgents: {}, personas: {}, lan: [], calibration: {}, directory: 1 };
 
 function load() {
   try {
@@ -34,6 +34,10 @@ const robotById = id => catalog.robots.find(item => item.id === id);
 const currentRobot = () => robotById(session.connection?.id);
 const agentById = id => catalog.agents.find(item => item.id === id);
 const getAgent = () => agentById(session.agent);
+const currentPersona = () => {
+  const personas = agentById("talk").personas;
+  return personas.find(persona => persona.id === saved.personas[currentRobot()?.id]) || personas[0];
+};
 const agentLabel = agent => tr(agent.name, agent.en);
 const robotLabel = robot => tr(robot.name, (robot.model === "K1" ? "Training unit " : "Show unit ") + robot.id.split("-")[1]);
 const modeLabel = mode => ({ damp: tr("阻尼", "Damping"), ready: tr("准备", "Ready"), walk: tr("行走", "Walking") })[mode];
@@ -110,6 +114,11 @@ function render() {
   const focusedAction = document.activeElement?.dataset.action;
   const focusedValue = document.activeElement?.dataset.value;
   const priorDialog = root.querySelector("[role=dialog]")?.dataset.dialog;
+  const scrollAreas = ["#control-actions", ".group-members", ".group-shortcuts"];
+  const scrollPositions = scrollAreas.map(selector => {
+    const area = root.querySelector(selector);
+    return area ? [area.scrollLeft, area.scrollTop] : [0, 0];
+  });
   document.documentElement.lang = saved.language === "en" ? "en" : "zh-CN";
   root.innerHTML = views[session.page]();
   if (renderedPage !== session.page) {
@@ -121,13 +130,15 @@ function render() {
     (root.querySelector(".confirm-slider") || root.querySelector("[role=dialog] button"))?.focus();
   } else if (priorDialog && !session.dialog) {
     const opener = priorDialog.startsWith("mode-") ? '[data-action="mode"][data-value="' + priorDialog.slice(5) + '"]' :
-      priorDialog === "stop-release" ? '[data-action="emergency"]' : '[data-action="agent-picker"]';
+      ({ "stop-release": '[data-action="emergency"]', chat: '[data-action="open-chat"]',
+        "add-action": '[data-action="add-action"]' })[priorDialog] || '[data-action="agent-picker"]';
     root.querySelector(opener)?.focus({ preventScroll: true });
   } else if (focusedAction) {
     Array.from(root.querySelectorAll("button[data-action]")).find(item =>
       item.dataset.action === focusedAction && item.dataset.value === focusedValue
     )?.focus({ preventScroll: true });
   }
+  scrollAreas.forEach((selector, index) => root.querySelector(selector)?.scrollTo(...scrollPositions[index]));
   if (session.page === "control") updateMotion();
 }
 
@@ -165,6 +176,7 @@ function route(page) {
   stopAction();
   clearGroupTimer();
   clearTimeout(poseTimer);
+  if (page !== session.page) toastBox.classList.remove("on");
   clearInputs();
   session.dialog = "";
   session.error = "";
@@ -378,6 +390,16 @@ function robotStopped() {
   return session.stoppedRobots.has(session.connection?.id);
 }
 
+function agentActions(agent, robotId) {
+  const builtIn = agent.actions.map(([zh, en, duration, cancel, icon], index) => ({
+    id: agent.id + "-" + index, label: tr(zh, en), duration, cancel, icon: icon || agent.icon
+  }));
+  const custom = saved.skills.filter(skill => skill.targets.includes(robotId + "/" + agent.id)).map(skill => ({
+    id: skill.id, label: skill.name, duration: Math.max(3, skill.poses.length), cancel: true, icon: skill.icon
+  }));
+  return [...builtIn, ...custom];
+}
+
 function activeActions() {
   const agent = getAgent();
   const robot = currentRobot();
@@ -386,15 +408,12 @@ function activeActions() {
       { id: "base-get-up", label: tr("起身", "Get up"), duration: 4, cancel: true, icon: "↑" }
     ] : [];
   }
-  const builtin = agent.actions.map(([zh, en, duration, cancel], index) =>
-    ({ id: agent.id + "-" + index, label: tr(zh, en), duration, cancel, icon: agent.id === "base" ? ["◔", "◇", "⌁", "✦"][index] : agent.icon }));
-  const custom = saved.skills.filter(skill => skill.targets.includes(robot.id + "/" + agent.id)).map(skill =>
-    ({ id: skill.id, label: skill.name, duration: Math.max(3, skill.poses.length), cancel: true, icon: skill.icon }));
-  return [...builtin, ...custom];
+  return agentActions(agent, robot.id);
 }
 
 function control() {
   const robot = currentRobot();
+  const agent = getAgent();
   const online = connected();
   const locked = !online || robotStopped();
   const adjustable = !locked && !session.running && !session.dialog;
@@ -402,7 +421,8 @@ function control() {
   const showFeed = online && session.camera;
   const status = online ? tr("已连接", "Connected") + " · " + linkLabel(session.connection.kind) : tr("已掉线", "Connection lost");
   return '<section class="console"><div class="control-surface"' + (session.dialog ? " inert" : "") +
-    '><div class="stage' + (showFeed ? "" : " paused") + '" role="region" aria-label="' + tr("机器人图传", "Robot feed") +
+    '><div class="stage' + (showFeed ? "" : " paused") + '"' + (agent.scene ? ' data-scene="' + agent.id + '"' : "") +
+    ' role="region" aria-label="' + tr("模拟图传", "Simulated feed") +
     '"><div class="feed"></div>' +
     (!showFeed ? '<div class="stage-message"><span>' + (online ? tr("图传已暂停", "Feed paused") : tr("连接已中断", "Connection lost")) + "</span></div>" : "") +
     '</div><header class="console-top"><div class="row">' +
@@ -415,7 +435,8 @@ function control() {
     button(tr("设备设置", "Robot settings"), "nav", "", { value: "settings" }) +
     (online ? button(robotStopped() ? tr("解除急停", "Release stop") : tr("急停", "Stop"), "emergency", "stop-button",
       { value: robotStopped() ? "release" : "stop" }) : "") +
-    '</div></header><span class="pill feed-note">' + tr("模拟 · 前相机", "Simulation · Front camera") +
+    '</div></header><span class="pill feed-note">' + (agent.scene ? tr("模拟场景", "Simulated scene") + " · " + tr(...agent.scene) :
+      tr("模拟 · 前相机", "Simulation · Front camera")) +
     '</span><output class="stage-meter" id="motion-output"></output>' +
     '<div class="sticks">' + Object.entries(stickNames()).map(([key, name]) =>
       '<div class="stick-slot stick-' + key + '"><button type="button" class="stick" data-stick="' + key + '" aria-label="' + name +
@@ -431,21 +452,35 @@ function control() {
 }
 
 function controlActions(locked) {
-  const actions = activeActions();
+  const agent = getAgent();
+  const walking = session.mode === "walk";
+  const actions = agent.scene && !walking ? agentActions(agent, currentRobot().id) : activeActions();
   const expanded = session.actionsExpanded;
-  const content = actions.map(action => {
+  const tiles = actions.map(action => {
     const active = session.running?.action.id === action.id;
-    const disabled = locked || (session.running && !active);
-    return '<button type="button" class="action-tile" data-action="run" data-value="' + escapeHtml(action.id) +
-      '" aria-pressed="' + Boolean(active) + '"' + (disabled ? " disabled" : "") + '><span aria-hidden="true">' +
-      escapeHtml(action.icon) + "</span>" + escapeHtml(action.label) + "</button>";
-  }).join("") + (session.agent === "teach" ? button(tr("打开示教", "Open teaching"), "begin-teach", "", { disabled: locked }) : "") +
-    (session.agent === "talk" ? button(tr("模拟对话", "Simulated conversation"), "open-chat", "", { disabled: locked }) : "");
-  return '<footer class="action-panel' + (expanded ? " expanded" : "") + '"><div class="action-panel-top"><button type="button" class="panel-toggle" data-action="toggle-actions" aria-controls="control-actions" aria-expanded="' +
+    const disabled = locked || (agent.scene && !walking) || (session.running && !active);
+    return consoleTile(action.label, action.icon, "run", action.id, { pressed: Boolean(active), disabled });
+  }).join("");
+  const personaTiles = agent.personas?.map(persona => consoleTile(tr(...persona.name), persona.icon, "select-persona", persona.id, {
+    disabled: locked, pressed: persona === currentPersona(), tone: persona.tone
+  })).join("") || "";
+  const chat = agent.personas ? consoleTile(tr("模拟对话", "Simulated conversation"), "…", "open-chat", "", { disabled: locked }) : "";
+  const teach = agent.id === "teach" ? button(tr("打开示教", "Open teaching"), "begin-teach", "", { disabled: locked }) : "";
+  const add = agent.addShortcut ? consoleTile(tr("添加动作", "Add action"), "+", "add-action", "", { disabled: locked || Boolean(session.running) }) : "";
+  return '<footer class="action-panel' + (expanded ? " expanded" : "") + (agent.scene ? " agent-components" : "") +
+    '"><div class="action-panel-top"><button type="button" class="panel-toggle" data-action="toggle-actions" aria-controls="control-actions" aria-expanded="' +
     expanded + '" aria-label="' + (expanded ? tr("收起动作", "Collapse actions") : tr("展开动作", "Expand actions")) + '">' +
-    tr("动作", "Actions") + '<span aria-hidden="true">' + (expanded ? "⌄" : "⌃") + '</span></button>' +
+    (agent.personas ? tr("角色", "Personas") : tr("动作", "Actions")) + '<span aria-hidden="true">' + (expanded ? "⌄" : "⌃") + '</span></button>' +
     '<p class="caption" id="action-output" role="status">' + escapeHtml(actionMessage()) + '</p></div>' +
-    '<div class="action-grid" id="control-actions"' + (expanded ? "" : " hidden") + '>' + content + "</div></footer>";
+    '<div class="action-grid" id="control-actions"' + (expanded ? "" : " hidden") + '>' +
+    personaTiles + chat + tiles + teach + add + "</div></footer>";
+}
+
+function consoleTile(label, icon, action, value, options = {}) {
+  return '<button type="button" class="action-tile" data-action="' + action + '" data-value="' + escapeHtml(value) +
+    '"' + (options.pressed === undefined ? "" : ' aria-pressed="' + options.pressed + '"') + (options.disabled ? " disabled" : "") +
+    '><span aria-hidden="true"' + (options.tone ? ' class="persona-icon ' + options.tone + '"' : "") + '>' +
+    escapeHtml(icon) + "</span>" + escapeHtml(label) + "</button>";
 }
 
 function actionMessage() {
@@ -454,6 +489,7 @@ function actionMessage() {
     tr("准备中", "Preparing") : tr("执行中", "Running") + " " + run.remaining + " s");
   if (!connected()) return tr("连接恢复后，请重新选择操作。", "Choose a new action after reconnecting.");
   if (robotStopped()) return tr("已急停 · 操作锁定", "Stopped · Controls locked");
+  if (getAgent().personas) return tr("当前角色 · ", "Current persona · ") + tr(...currentPersona().name);
   if (session.mode === "damp") return tr("阻尼模式 · 先进入准备", "Damping · Select Ready first");
   if (session.mode === "ready") return tr("准备模式 · 站稳后进入行走", "Ready · Select Walking once stable");
   return tr("行走模式 · 可操控并执行动作", "Walking · Controls and actions available");
@@ -655,11 +691,26 @@ function controlDialog() {
     body = '<p>' + tr("解除后回到阻尼模式，请重新选择准备。此前的运动和动作保持停止。", "Returns to Damping. Select Ready again. Previous movement and actions stay stopped.") +
       '</p><div>' + button(tr("确认解除", "Confirm release"), "release-stop", "primary") + "</div>";
   } else if (session.dialog === "chat") {
+    const persona = currentPersona();
+    title = tr("模拟对话", "Simulated conversation") + " · " + tr(...persona.name);
     body = '<form class="form" data-form="chat"><label class="field">' +
       tr("给对话伙伴发送问候", "Send a greeting to your companion") +
       '<input name="chat" required maxlength="80" autocomplete="off"></label>' +
       button(tr("发送", "Send"), "chat-submit", "primary", { type: "submit" }) +
       '</form><p id="chat-reply" role="status"></p>';
+  } else if (session.dialog === "add-action") {
+    title = tr("添加舞蹈动作", "Add a dance action");
+    const target = robot.id + "/" + agent.id;
+    const skills = saved.skills.filter(skill => !skill.targets.includes(target));
+    body = '<div class="stack">' + (skills.length ?
+      '<form class="form" data-form="bind-action"><label class="field">' + tr("从技能库选择", "Choose from Skills") +
+        '<select name="skill">' + skills.map(skill => '<option value="' + escapeHtml(skill.id) + '">' + escapeHtml(skill.name) + "</option>").join("") +
+        '</select></label>' + button(tr("添加到舞蹈面板", "Add to dance panel"), "bind-action-submit", "primary", { type: "submit" }) + "</form>" :
+      '<p>' + tr("暂无可添加的技能。可以先录制一个动作。", "Record a motion to create a shortcut.") + "</p>") +
+      '<div>' + button(tr("录制新动作", "Record new action"), "teach-shortcut") + "</div></div>";
+  } else if (agent.personas) {
+    body = '<p>' + tr("当前角色", "Current persona") + " · " + tr(...currentPersona().name) + "</p><div>" +
+      button(tr("模拟对话", "Simulated conversation"), "open-chat") + "</div>";
   } else {
     const level = saved.preferences[robot.id + "/" + agent.id] || "standard";
     body = '<form class="form" data-form="agent-preference"><label class="field">' +
@@ -767,10 +818,11 @@ function skills() {
     null, false);
 }
 
-function startTeaching(id) {
+function startTeaching(id, shortcutTarget = "") {
   const old = saved.skills.find(skill => skill.id === id);
   session.teaching = {
-    id: old?.id, name: old?.name || "", poses: old ? [...old.poses] : [], targets: old ? [...old.targets] : [],
+    id: old?.id, name: old?.name || "", poses: old ? [...old.poses] : [], targets: old ? [...old.targets] : shortcutTarget ? [shortcutTarget] : [],
+    shortcutTarget,
     icon: old?.icon || "◇", tone: old?.tone || "sky", recording: false, playing: false, pose: 0, deletePrompt: false
   };
   route("teaching");
@@ -813,7 +865,7 @@ function teaching() {
     '<div class="row">' + button(tr("保存技能", "Save skill"), "skill-submit", "primary", {
       type: "submit", disabled: item.recording || item.playing || item.poses.length < 2
     }) + (item.id ? button(item.deletePrompt ? tr("确认删除技能", "Confirm skill deletion") : tr("删除技能", "Delete skill"), "delete-skill", "danger") : "") +
-    '</div></form>', "nav", true, "skills");
+    '</div></form>', "nav", true, item.shortcutTarget ? "control" : "skills");
 }
 
 function playPoses(index = 0) {
@@ -841,13 +893,13 @@ function persistSkill(name) {
   const skill = { id, name: name.trim(), poses: item.poses, targets: item.targets, icon: item.icon, tone: item.tone };
   saved.skills = [...saved.skills.filter(existing => existing.id !== id), skill];
   persist();
-  route("skills");
+  route(item.shortcutTarget ? "control" : "skills");
   toast(tr("技能已保存", "Skill saved"));
 }
 
 function startGroup() {
-  session.group = { step: "choose", ids: [], lead: "", hold: 3, delay: null, active: null, countdown: null,
-    batch: [], results: {}, walk: false };
+  session.group = { step: "choose", ids: [], lead: "", hold: 3, active: null, countdown: null,
+    batch: [], results: {}, walk: false, stopped: false, agent: "" };
   route("group");
 }
 
@@ -857,7 +909,7 @@ function groupChecks(ids) {
   const units = ids.map(robotById);
   const same = units.every(unit => unit.model === units[0].model && unit.firmware === units[0].firmware);
   if (!same) return tr("机型和固件版本须一致。", "Robot models and firmware versions must match.");
-  if (units.some(unit => unit.battery < 30)) return tr("有设备电量不足，请更换后继续。", "Replace the low-battery device before continuing.");
+  if (units.filter(unit => unit.battery >= 30).length < 2) return tr("至少需要两台电量达到 30% 的设备。", "At least two robots need 30% battery.");
   return "";
 }
 
@@ -870,12 +922,12 @@ function groupCards(items, name, checked, details) {
 
 function groupView() {
   const item = session.group;
-  const inGroup = item.step === "run";
+  if (item.step === "run") return groupConsole(item);
   let content;
   let description;
   switch (item.step) {
     case "choose":
-      description = tr("从同一网络选择同型号设备。", "Select robots of the same model on the same network.");
+      description = tr("选择 2–10 台同型号设备。低于 30% 电量的成员只展示状态。", "Select 2–10 robots of the same model. Members below 30% battery are view-only.");
       content = '<form class="form" data-form="group-choose">' + groupCards(lanRobots(), "members", item.ids) + alertMessage() +
         '<div class="row">' + button(tr("下一步", "Next"), "group-choose-submit", "primary", { type: "submit" }) +
         button(tr("批量配网", "Batch Wi-Fi setup"), "group-batch") + "</div></form>";
@@ -907,40 +959,60 @@ function groupView() {
       description = tr("其他成员使用领队的动作库。", "Group members use the lead robot’s action library.");
       content = '<form class="form card" data-form="group-lead"><label class="field">' + tr("选择领队", "Select lead robot") +
         '<select name="lead" aria-label="' + tr("选择领队", "Select lead robot") + '">' +
-        item.ids.map(id => '<option value="' + id + '">' + id + "</option>").join("") + '</select></label>' +
+        item.ids.filter(id => robotById(id).battery >= 30).map(id => '<option value="' + id + '">' + id + "</option>").join("") + '</select></label>' +
         button(tr("进入群控", "Enter group control"), "group-lead-submit", "primary", { type: "submit" }) + "</form>";
       break;
-    case "run": {
-      description = tr("领队 ", "Lead robot ") + item.lead;
-      const leadAgent = preferredAgent(robotById(item.lead));
-      const actions = leadAgent.actions.map(([zh, en, seconds], index) =>
-        ({ id: String(index), label: tr(zh, en), duration: seconds }));
-      const custom = saved.skills.filter(skill => skill.targets.includes(item.lead + "/" + leadAgent.id)).map(skill =>
-        ({ id: skill.id, label: skill.name, duration: Math.max(3, skill.poses.length) }));
-      item.actions = [...actions, ...custom];
-      content = '<div class="three">' + item.ids.map(id => {
-        const robot = robotById(id);
-        return '<article class="card stack"><h3>' + id + '</h3><div class="row">' + chip(robot.battery + "%", "green") +
-          chip(item.walk ? tr("行走", "Walking") : tr("准备", "Ready")) + '</div><p class="caption">' +
-          (item.active ? escapeHtml(item.active.label) : tr("待命", "Standing by")) + '</p></article>';
-      }).join("") + '</div><section class="card stack"><div class="row">' +
-        button(item.walk ? tr("切回准备", "Return to Ready") : tr("统一进入行走", "Set all to Walking"), "group-walk") +
-        button(tr("停止群控动作", "Stop group action"), "group-stop", "", { disabled: !item.active }) +
-        '</div><label class="field">' + tr("同步等待时间（秒）", "Start delay (seconds)") +
-        '<input type="number" min="1" max="10" name="group-delay" value="' + item.hold + '"' + (item.active ? " disabled" : "") +
-        '></label><div class="row">' + item.actions.map(action =>
-          button(action.label, "group-run", "", { value: action.id, disabled: !item.walk || Boolean(item.active) })
-        ).join("") + '</div><p id="group-status" class="caption" role="status">' + groupMessage() +
-        '</p></section><div>' + button(tr("退出群控", "Exit group control"), "nav", "ghost", { value: "home" }) + "</div>";
-      break;
-    }
   }
-  const back = inGroup || item.step === "choose" ? "nav" : "group-choose";
-  return screen(tr("群控", "Group control"), description, content, back, !inGroup, "home");
+  return screen(tr("群控", "Group control"), description, content, item.step === "choose" ? "nav" : "group-choose", true, "home");
+}
+
+function groupAgents(lead) {
+  return catalog.agents.filter(agent => compatible(agent, lead) && installed(lead, agent) && agentActions(agent, lead.id).length);
+}
+
+function groupMember(robot, item) {
+  const low = robot.battery < 30;
+  const lead = robot.id === item.lead;
+  let status = item.walk ? tr("行走", "Walking") : tr("准备", "Ready");
+  if (item.active) status = item.countdown > 0 ? tr("等待同步", "Queued") : item.active.label;
+  if (low) status = tr("低电待命", "Low battery · standby");
+  if (item.stopped) status = tr("已急停", "Stopped");
+  return '<article class="group-unit' + (lead ? " lead" : "") + (low ? " low" : "") + '"><div class="row-between"><strong>' + robot.id +
+    '</strong>' + (lead ? chip(tr("领队", "Lead"), "green") : "") +
+    '</div><div class="group-unit-figure" aria-hidden="true"><i></i><b></b><span></span></div><div class="row-between"><span class="group-member-state">' +
+    escapeHtml(status) + '</span><span class="group-battery" aria-label="' + tr("电量 ", "Battery ") + robot.battery + '%">' + robot.battery +
+    "%</span></div></article>";
+}
+
+function groupConsole(item) {
+  const choices = groupAgents(robotById(item.lead));
+  const agent = choices.find(option => option.id === item.agent) || choices[0];
+  const available = agentActions(agent, item.lead);
+  const enabled = item.walk && !item.active && !item.stopped;
+  return '<section class="group-console"><header class="group-top"><div><h1>' + tr("群控工作台", "Group control") + '</h1><p>' +
+    tr("模拟 · ", "Simulation · ") + item.ids.length + tr(" 台设备 · 领队 ", " robots · Lead ") + item.lead +
+    '</p></div><div class="row">' +
+    button(item.stopped ? tr("解除群组急停", "Release group stop") : tr("群组急停", "Emergency stop"), "group-emergency", "danger") +
+    button(tr("退出群控", "Exit group control"), "nav", "ghost", { value: "home" }) +
+    '</div></header><div class="group-members" aria-label="' + tr("成员状态", "Member status") + '">' +
+    item.ids.map(id => groupMember(robotById(id), item)).join("") +
+    '</div><section class="group-actions"><div class="group-action-controls">' +
+    '<label class="group-field">' + tr("领队 Agent", "Lead Agent") + '<select name="group-agent"' + (item.active || item.stopped ? " disabled" : "") + '>' +
+    choices.map(option => '<option value="' + option.id + '"' + (option === agent ? " selected" : "") + '>' + agentLabel(option) + '</option>').join("") +
+    '</select></label><label class="group-field">' + tr("倒计时（秒）", "Delay (s)") +
+    '<input type="number" min="1" max="10" required name="group-delay" value="' + item.hold + '"' + (item.active || item.stopped ? " disabled" : "") +
+    '></label><div class="row group-mode">' +
+    button(tr("准备", "Ready"), "group-walk", "", { value: "ready", pressed: !item.walk && !item.stopped, disabled: item.stopped }) +
+    button(tr("行走", "Walking"), "group-walk", "", { value: "walk", pressed: item.walk, disabled: item.stopped }) +
+    button(tr("停止动作", "Stop action"), "group-stop", "", { disabled: !item.active }) +
+    '</div></div><div class="group-shortcuts">' + available.map(action =>
+      consoleTile(action.label, action.icon, "group-run", action.id, { disabled: !enabled, pressed: item.active?.id === action.id })
+    ).join("") + '</div><p id="group-status" class="caption" role="status">' + escapeHtml(groupMessage()) + '</p></section></section>';
 }
 
 function groupMessage() {
   const item = session.group;
+  if (item.stopped) return tr("群组已急停 · 操作锁定", "Group stopped · Controls locked");
   if (!item.active) return tr("等待同步指令。", "Waiting for a group command.");
   if (item.countdown > 0) return tr("同步倒计时 ", "Group countdown ") + item.countdown + " s";
   return tr("正在同步执行 ", "Running together ") + Math.abs(item.countdown + item.active.duration) + " s";
@@ -967,9 +1039,11 @@ function batchNext(queue, failId) {
 
 function startGroupAction(id) {
   const item = session.group;
-  const action = item.actions.find(entry => entry.id === id);
+  if (!item.walk || item.active || item.stopped) return;
+  const agent = groupAgents(robotById(item.lead)).find(option => option.id === item.agent);
+  const action = agent && agentActions(agent, item.lead).find(entry => entry.id === id);
   const delay = root.querySelector('[name="group-delay"]');
-  if (!action || !item.walk || item.active || !delay.reportValidity()) return;
+  if (!action || !delay.reportValidity()) return;
   item.hold = Number(delay.value);
   item.active = action;
   item.countdown = item.hold;
@@ -980,6 +1054,8 @@ function startGroupAction(id) {
       clearGroupTimer();
       render();
       toast(tr("群控动作完成", "Group action complete"));
+    } else if (item.countdown === 0) {
+      render();
     } else {
       root.querySelector("#group-status").textContent = groupMessage();
     }
@@ -1161,6 +1237,15 @@ const actions = {
   "agent-picker": () => openControlDialog("agents"),
   "agent-settings": () => openControlDialog("settings"),
   "open-chat": () => openControlDialog("chat"),
+  "select-persona": id => {
+    if (!connected() || robotStopped() || !getAgent().personas?.some(persona => persona.id === id)) return;
+    saved.personas[currentRobot().id] = id;
+    persist();
+    render();
+    root.querySelector('[data-action="select-persona"][aria-pressed="true"]')?.focus();
+  },
+  "add-action": () => openControlDialog("add-action"),
+  "teach-shortcut": () => startTeaching(undefined, currentRobot().id + "/" + session.agent),
   "close-dialog": () => {
     session.dialog = "";
     render();
@@ -1172,6 +1257,7 @@ const actions = {
     stopAction();
     clearInputs();
     session.agent = id;
+    root.querySelector("#control-actions")?.scrollTo(0, 0);
     saved.robotAgents[robot.id] = id;
     persist();
     session.dialog = "";
@@ -1236,9 +1322,10 @@ const actions = {
   },
   "group-choose": groupChoose,
   "group-retry": id => batchNext(id ? [id] : session.group.batch.filter(entry => session.group.results[entry] === "failed")),
-  "group-walk": () => {
+  "group-walk": mode => {
+    if (session.group.stopped || (mode === "walk") === session.group.walk) return;
     clearGroupTimer();
-    session.group.walk = !session.group.walk;
+    session.group.walk = mode === "walk";
     render();
   },
   "group-stop": () => {
@@ -1247,6 +1334,13 @@ const actions = {
     toast(tr("群控动作已停止", "Group action stopped"));
   },
   "group-run": startGroupAction,
+  "group-emergency": () => {
+    const item = session.group;
+    clearGroupTimer();
+    item.stopped = !item.stopped;
+    item.walk = false;
+    render();
+  },
   "start-calibration": startCalibration,
   "calibration-mode": mode => {
     session.mode = mode;
@@ -1323,11 +1417,19 @@ const forms = {
   chat: (data, form) => {
     const message = String(data.get("chat") || "").trim();
     if (!message) return;
-    const preference = saved.preferences[currentRobot().id + "/talk"];
-    const response = preference === "slow" ? tr("语言教练：你好，我们来练习打招呼。", "Language coach: Hello, let’s practice a greeting.") :
-      tr("日常伙伴：你好！准备好一起训练了吗？", "Everyday companion: Hello! Ready to practice together?");
-    root.querySelector("#chat-reply").textContent = response;
+    const persona = currentPersona();
+    root.querySelector("#chat-reply").textContent = tr(...persona.name) + " · " + tr(...persona.reply);
     form.reset();
+  },
+  "bind-action": data => {
+    const skill = saved.skills.find(item => item.id === data.get("skill"));
+    if (!skill || !connected() || robotStopped() || session.dialog !== "add-action") return;
+    const target = currentRobot().id + "/" + session.agent;
+    if (!skill.targets.includes(target)) skill.targets.push(target);
+    persist();
+    session.dialog = "";
+    render();
+    toast(tr("已添加舞蹈动作", "Dance action added"));
   },
   "save-skill": data => persistSkill(String(data.get("skill-name") || "")),
   "group-choose": data => {
@@ -1337,8 +1439,13 @@ const forms = {
     render();
   },
   "group-lead": data => {
-    session.group.lead = data.get("lead");
-    session.group.step = "run";
+    const item = session.group;
+    const lead = robotById(data.get("lead"));
+    if (!lead || !item.ids.includes(lead.id) || lead.battery < 30) return;
+    item.lead = lead.id;
+    const choices = groupAgents(lead);
+    item.agent = (choices.find(agent => agent === preferredAgent(lead)) || choices[0]).id;
+    item.step = "run";
     render();
   },
   "group-batch": (data, form) => {
@@ -1387,6 +1494,7 @@ root.addEventListener("input", event => {
   }
   if (session.page === "teaching" && name === "skill-name") session.teaching.name = value;
   if (session.page === "calibration" && name === "aligned") session.calibration.aligned = event.target.checked;
+  if (session.page === "group" && name === "group-delay" && event.target.validity.valid) session.group.hold = Number(value);
 });
 root.addEventListener("change", event => {
   if (event.target.name === "confirm-mode") {
@@ -1397,6 +1505,13 @@ root.addEventListener("change", event => {
     session.join.network = event.target.value;
     render();
     root.querySelector('[name="network"]')?.focus();
+  }
+  if (session.page === "group" && event.target.name === "group-agent" && !session.group.active && !session.group.stopped) {
+    const { value } = event.target;
+    if (!groupAgents(robotById(session.group.lead)).some(agent => agent.id === value)) return;
+    session.group.agent = value;
+    render();
+    root.querySelector('[name="group-agent"]')?.focus();
   }
 });
 root.addEventListener("keydown", event => {
