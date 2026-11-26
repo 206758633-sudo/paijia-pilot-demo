@@ -114,6 +114,7 @@ function render() {
   const focusedAction = document.activeElement?.dataset.action;
   const focusedValue = document.activeElement?.dataset.value;
   const priorDialog = root.querySelector("[role=dialog]")?.dataset.dialog;
+  const previousVideo = root.querySelector(".motion-preview video");
   const scrollAreas = ["#control-actions", ".group-members", ".group-shortcuts"];
   const scrollPositions = scrollAreas.map(selector => {
     const area = root.querySelector(selector);
@@ -139,6 +140,16 @@ function render() {
     )?.focus({ preventScroll: true });
   }
   scrollAreas.forEach((selector, index) => root.querySelector(selector)?.scrollTo(...scrollPositions[index]));
+  const video = root.querySelector(".motion-preview video");
+  if (video) {
+    const sameClip = previousVideo?.src === video.src;
+    if (sameClip) video.currentTime = previousVideo.currentTime;
+    if (!sameClip && session.page === "group") {
+      root.querySelector('.group-shortcuts [aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+    video.addEventListener("error", () => showMotionPlaybackError(video), { once: true });
+    if (!sameClip || !previousVideo.ended) playMotionPreview(video);
+  }
   if (session.page === "control") updateMotion();
 }
 
@@ -391,8 +402,8 @@ function robotStopped() {
 }
 
 function agentActions(agent, robotId) {
-  const builtIn = agent.actions.map(([zh, en, duration, cancel, icon], index) => ({
-    id: agent.id + "-" + index, label: tr(zh, en), duration, cancel, icon: icon || agent.icon
+  const builtIn = agent.actions.map(([zh, en, duration, cancel, icon, clip], index) => ({
+    id: agent.id + "-" + index, label: tr(zh, en), duration, cancel, icon: icon || agent.icon, clip
   }));
   const custom = saved.skills.filter(skill => skill.targets.includes(robotId + "/" + agent.id)).map(skill => ({
     id: skill.id, label: skill.name, duration: Math.max(3, skill.poses.length), cancel: true, icon: skill.icon
@@ -459,7 +470,7 @@ function controlActions(locked) {
   const tiles = actions.map(action => {
     const active = session.running?.action.id === action.id;
     const disabled = locked || (agent.scene && !walking) || (session.running && !active);
-    return consoleTile(action.label, action.icon, "run", action.id, { pressed: Boolean(active), disabled });
+    return consoleTile(action.label, action.icon, "run", action.id, { pressed: Boolean(active), disabled, clip: action.clip });
   }).join("");
   const personaTiles = agent.personas?.map(persona => consoleTile(tr(...persona.name), persona.icon, "select-persona", persona.id, {
     disabled: locked, pressed: persona === currentPersona(), tone: persona.tone
@@ -468,7 +479,8 @@ function controlActions(locked) {
   const teach = agent.id === "teach" ? button(tr("打开示教", "Open teaching"), "begin-teach", "", { disabled: locked }) : "";
   const add = agent.addShortcut ? consoleTile(tr("添加动作", "Add action"), "+", "add-action", "", { disabled: locked || Boolean(session.running) }) : "";
   return '<footer class="action-panel' + (expanded ? " expanded" : "") + (agent.scene ? " agent-components" : "") +
-    '"><div class="action-panel-top"><button type="button" class="panel-toggle" data-action="toggle-actions" aria-controls="control-actions" aria-expanded="' +
+    '">' + motionPreview(session.running?.action, Boolean(session.running && session.running.remaining <= session.running.action.duration)) +
+    '<div class="action-panel-top"><button type="button" class="panel-toggle" data-action="toggle-actions" aria-controls="control-actions" aria-expanded="' +
     expanded + '" aria-label="' + (expanded ? tr("收起动作", "Collapse actions") : tr("展开动作", "Expand actions")) + '">' +
     (agent.personas ? tr("角色", "Personas") : tr("动作", "Actions")) + '<span aria-hidden="true">' + (expanded ? "⌄" : "⌃") + '</span></button>' +
     '<p class="caption" id="action-output" role="status">' + escapeHtml(actionMessage()) + '</p></div>' +
@@ -477,16 +489,45 @@ function controlActions(locked) {
 }
 
 function consoleTile(label, icon, action, value, options = {}) {
+  const videoBadge = options.clip ? '<span class="motion-marker" aria-hidden="true" title="' + tr("含动作视频", "Motion video available") + '">▸</span>' : "";
   return '<button type="button" class="action-tile" data-action="' + action + '" data-value="' + escapeHtml(value) +
     '"' + (options.pressed === undefined ? "" : ' aria-pressed="' + options.pressed + '"') + (options.disabled ? " disabled" : "") +
     '><span aria-hidden="true"' + (options.tone ? ' class="persona-icon ' + options.tone + '"' : "") + '>' +
-    escapeHtml(icon) + "</span>" + escapeHtml(label) + "</button>";
+    escapeHtml(icon) + "</span>" + escapeHtml(label) + videoBadge + "</button>";
 }
+
+function motionPreview(action, playing, group = false) {
+  if (!action?.clip || !playing) return "";
+  const source = action.clip === "wave" ? tr("模型演示", "Model animation") : tr("仿真动作视频", "Recorded simulation");
+  const label = group ? source + " · " + tr("单机动作示意", "Single-robot example") : source;
+  return '<figure class="motion-preview"><video src="./pilot-app/motion/' + action.clip + '.mp4" muted playsinline preload="metadata" aria-label="' +
+    escapeHtml(action.label) + '"></video><figcaption>' + escapeHtml(label) + '</figcaption>' +
+    '<div class="motion-fallback" hidden><p role="status"></p>' + button(tr("重试播放", "Retry playback"), "retry-motion") + '</div></figure>';
+}
+
+function showMotionPlaybackError(video) {
+  const fallback = video.parentElement?.querySelector(".motion-fallback");
+  if (!fallback || !video.isConnected) return;
+  fallback.querySelector("p").textContent = tr("动作视频暂不可播放", "Motion video unavailable");
+  fallback.hidden = false;
+}
+
+function playMotionPreview(video) {
+  video.muted = true;
+  video.play().then(() => {
+    const fallback = video.parentElement?.querySelector(".motion-fallback");
+    if (fallback) fallback.hidden = true;
+  }).catch(error => {
+    if (error.name !== "AbortError") showMotionPlaybackError(video);
+  });
+}
+
+const missingMotionNote = action => action.clip ? "" : tr(" · 暂无对应动作视频", " · No matching motion video");
 
 function actionMessage() {
   const run = session.running;
   if (run) return run.action.label + " · " + (run.remaining > run.action.duration ?
-    tr("准备中", "Preparing") : tr("执行中", "Running") + " " + run.remaining + " s");
+    tr("准备中", "Preparing") : tr("执行中", "Running") + " " + run.remaining + " s") + missingMotionNote(run.action);
   if (!connected()) return tr("连接恢复后，请重新选择操作。", "Choose a new action after reconnecting.");
   if (robotStopped()) return tr("已急停 · 操作锁定", "Stopped · Controls locked");
   if (getAgent().personas) return tr("当前角色 · ", "Current persona · ") + tr(...currentPersona().name);
@@ -548,6 +589,7 @@ function runAction(id) {
   }
   const action = activeActions().find(item => item.id === id);
   if (!action) return;
+  toastBox.classList.remove("on");
   clearInputs();
   session.running = { action, remaining: action.duration + 1 };
   render();
@@ -557,6 +599,8 @@ function runAction(id) {
       stopAction();
       render();
       toast(action.label + " · " + tr("已完成", "Completed"));
+    } else if (action.clip && session.running.remaining === action.duration) {
+      render();
     } else {
       document.querySelector("#action-output").textContent = actionMessage();
     }
@@ -989,6 +1033,7 @@ function groupConsole(item) {
   const agent = choices.find(option => option.id === item.agent) || choices[0];
   const available = agentActions(agent, item.lead);
   const enabled = item.walk && !item.active && !item.stopped;
+  const preview = motionPreview(item.active, item.countdown <= 0, true);
   return '<section class="group-console"><header class="group-top"><div><h1>' + tr("群控工作台", "Group control") + '</h1><p>' +
     tr("模拟 · ", "Simulation · ") + item.ids.length + tr(" 台设备 · 领队 ", " robots · Lead ") + item.lead +
     '</p></div><div class="row">' +
@@ -996,7 +1041,7 @@ function groupConsole(item) {
     button(tr("退出群控", "Exit group control"), "nav", "ghost", { value: "home" }) +
     '</div></header><div class="group-members" aria-label="' + tr("成员状态", "Member status") + '">' +
     item.ids.map(id => groupMember(robotById(id), item)).join("") +
-    '</div><section class="group-actions"><div class="group-action-controls">' +
+    '</div><section class="group-actions' + (preview ? " with-motion" : "") + '"><div class="group-action-controls">' +
     '<label class="group-field">' + tr("领队 Agent", "Lead Agent") + '<select name="group-agent"' + (item.active || item.stopped ? " disabled" : "") + '>' +
     choices.map(option => '<option value="' + option.id + '"' + (option === agent ? " selected" : "") + '>' + agentLabel(option) + '</option>').join("") +
     '</select></label><label class="group-field">' + tr("倒计时（秒）", "Delay (s)") +
@@ -1006,16 +1051,17 @@ function groupConsole(item) {
     button(tr("行走", "Walking"), "group-walk", "", { value: "walk", pressed: item.walk, disabled: item.stopped }) +
     button(tr("停止动作", "Stop action"), "group-stop", "", { disabled: !item.active }) +
     '</div></div><div class="group-shortcuts">' + available.map(action =>
-      consoleTile(action.label, action.icon, "group-run", action.id, { disabled: !enabled, pressed: item.active?.id === action.id })
-    ).join("") + '</div><p id="group-status" class="caption" role="status">' + escapeHtml(groupMessage()) + '</p></section></section>';
+      consoleTile(action.label, action.icon, "group-run", action.id, { disabled: !enabled, pressed: item.active?.id === action.id, clip: action.clip })
+    ).join("") + '</div><p id="group-status" class="caption" role="status">' + escapeHtml(groupMessage()) + '</p>' + preview + '</section></section>';
 }
 
 function groupMessage() {
   const item = session.group;
   if (item.stopped) return tr("群组已急停 · 操作锁定", "Group stopped · Controls locked");
   if (!item.active) return tr("等待同步指令。", "Waiting for a group command.");
-  if (item.countdown > 0) return tr("同步倒计时 ", "Group countdown ") + item.countdown + " s";
-  return tr("正在同步执行 ", "Running together ") + Math.abs(item.countdown + item.active.duration) + " s";
+  const label = item.active.label + " · ";
+  if (item.countdown > 0) return label + tr("同步倒计时 ", "Group countdown ") + item.countdown + " s" + missingMotionNote(item.active);
+  return label + tr("正在同步执行 ", "Running together ") + Math.abs(item.countdown + item.active.duration) + " s" + missingMotionNote(item.active);
 }
 
 function batchNext(queue, failId) {
@@ -1226,6 +1272,12 @@ const actions = {
   },
   mode: askMode,
   run: runAction,
+  "retry-motion": () => {
+    const video = root.querySelector(".motion-preview video");
+    if (!video) return;
+    if (video.error) video.load();
+    playMotionPreview(video);
+  },
   emergency,
   "release-stop": releaseStop,
   "toggle-actions": () => {

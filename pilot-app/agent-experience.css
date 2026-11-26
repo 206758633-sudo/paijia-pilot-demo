@@ -23,6 +23,58 @@
 .persona-icon.clay { background:#efbca6; }
 .persona-icon.sky { background:#a9cbd6; }
 
+.action-tile { position:relative; }
+.action-tile .motion-marker {
+  position:absolute;
+  top:4px;
+  right:5px;
+  color:#e9f3bc;
+  font-size:12px;
+}
+.action-tile[aria-pressed="true"] .motion-marker { color:#25331d; }
+.motion-preview {
+  position:relative;
+  margin:0;
+  aspect-ratio:16/9;
+  isolation:isolate;
+  overflow:hidden;
+  border:1px solid #a1b79a;
+  border-radius:10px;
+  background:#121e1a;
+}
+.motion-preview video { display:block; width:100%; height:100%; object-fit:contain; }
+.motion-preview figcaption {
+  position:absolute;
+  top:5px;
+  left:5px;
+  padding:3px 6px;
+  border-radius:5px;
+  background:#15231bea;
+  color:#eff4da;
+  font-size:11px;
+  font-weight:750;
+}
+.motion-fallback {
+  position:absolute;
+  inset:0;
+  display:grid;
+  justify-items:center;
+  align-content:center;
+  gap:4px;
+  color:#f4f7ed;
+  background:#16271eeb;
+  font-size:12px;
+}
+.motion-fallback[hidden] { display:none; }
+.motion-fallback .btn { min-height:30px; padding:3px 8px; font-size:11px; }
+.action-panel > .motion-preview {
+  position:absolute;
+  left:50%;
+  bottom:calc(100% + 7px);
+  width:min(100%,58cqh,340px);
+  transform:translateX(-50%);
+}
+
 .group-console {
   min-height:100dvh;
   display:grid;
@@ -120,6 +172,25 @@
 .group-shortcuts .action-tile { flex:1 0 62px; min-height:42px; gap:3px; }
 .group-shortcuts .action-tile[aria-pressed="true"] { opacity:1; }
 .group-actions #group-status { color:#dbe9d1; font-size:12px; }
+.group-actions.with-motion { position:relative; padding-right:clamp(130px,26%,216px); }
+.group-actions.with-motion .motion-preview {
+  position:absolute;
+  top:50%;
+  right:8px;
+  width:clamp(112px,24%,198px);
+  max-height:calc(100% - 16px);
+  transform:translateY(-50%);
+}
+.group-actions.with-motion .group-shortcuts .action-tile {
+  flex-basis:77px;
+  height:45px;
+  min-height:45px;
+  padding:2px 4px;
+  gap:2px;
+  font-size:11px;
+  line-height:1.1;
+}
+.group-actions.with-motion .group-shortcuts .action-tile span { font-size:14px; }
 
 @media (min-width:760px) and (hover:hover) and (pointer:fine) {
   .device-screen .group-console {
@@ -130,6 +201,7 @@
 }
 @media (orientation:landscape) and (max-height:520px) {
   .group-console { height:100dvh; }
+  .group-actions.with-motion { gap:5px; padding-block:6px; }
 }
 @media (max-width:560px) {
   .group-members { grid-template-columns:repeat(3,minmax(0,1fr)); }

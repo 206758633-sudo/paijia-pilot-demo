@@ -20,10 +20,12 @@ const catalog = {
   ],
   agents: [
     { id: "base", name: "基础互动", en: "Essentials", icon: "✦", tone: "clay", models: ["K1", "T1"], builtIn: true, description: ["日常问候和互动动作", "Everyday greetings and gestures"], actions: [
-      ["挥手", "Wave", 4, true], ["握手", "Handshake", 4, true], ["抱拳", "Salute", 3, false], ["欢呼", "Cheer", 6, true]
+      ["挥手", "Wave", 4, true, "◔", "wave"], ["握手", "Handshake", 4, true], ["抱拳", "Salute", 3, false], ["欢呼", "Cheer", 6, true]
     ] },
     { id: "dance", name: "舞蹈训练", en: "Dance Practice", icon: "♫", tone: "iris", models: ["K1", "T1"], builtIn: true,
       scene: ["排练舞台", "Rehearsal stage"], addShortcut: true, description: ["节奏练习、舞蹈表演和自定义快捷动作", "Dance routines and custom shortcuts"], actions: [
+      ["横向太空滑步舞", "Space Slide", 8, true, "⌁", "space-slide"], ["转身小鸡欢快舞", "Chicken Dance", 7, true, "♪", "chicken-dance"],
+      ["律动热舞", "Rhythm Dance", 8, true, "♫", "rhythm-dance"], ["骑马舞", "Horse Dance", 10, true, "♬", "horse-dance"],
       ["摇滚舞蹈", "Rock Dance", 8, true, "♬"], ["拜年舞蹈", "New Year Dance", 8, true, "✺"], ["走向未来舞蹈", "Future Dance", 10, true, "⌁"],
       ["MJ舞蹈", "MJ Dance", 9, true, "↟"], ["阿拉伯舞蹈", "Arabic Dance", 9, true, "✧"], ["格斗踢腿", "Stage Kick", 6, true, "↗"],
       ["回旋踢", "Stage Spin", 6, true, "⟳"], ["山河故人", "Mountains & Rivers", 9, true, "◇"], ["改革春风", "Spring Breeze", 9, true, "✦"],
@@ -44,9 +46,10 @@ const catalog = {
     ] },
     { id: "soccer", name: "足球训练", en: "Football Practice", icon: "◎", tone: "moss", models: ["K1", "T1"], builtIn: true,
       scene: ["足球训练场", "Football training ground"], description: ["模拟盯球、追球、射门与庆祝", "Simulated ball tracking, shooting and celebrations"], actions: [
-      ["挥手", "Wave", 4, true, "◔"], ["握手", "Handshake", 4, true, "◇"], ["盯球", "Track Ball", 6, true, "⊙"],
+      ["挥手", "Wave", 4, true, "◔", "wave"], ["握手", "Handshake", 4, true, "◇"], ["盯球", "Track Ball", 6, true, "⊙"],
       ["追球", "Follow Ball", 7, true, "➝"], ["射门", "Shoot", 4, false, "◎"], ["大力踢球", "Power Shot", 5, false, "➚"],
-      ["Siuuu", "Siuuu", 6, true, "✦"], ["抱胸", "Cross Arms", 4, true, "×"], ["指天", "Point Up", 4, true, "↑"], ["摇篮", "Cradle", 5, true, "⌁"]
+      ["Siuuu", "Siuuu", 6, true, "✦"], ["抱胸", "Cross Arms", 4, true, "×"], ["指天", "Point Up", 4, true, "↑"], ["摇篮", "Cradle", 5, true, "⌁"],
+      ["转身小鸡欢快舞", "Chicken Dance", 7, true, "♪", "chicken-dance"]
     ] },
     { id: "lion", name: "舞狮", en: "Lion Dance", icon: "✺", tone: "clay", models: ["K1", "T1"], builtIn: true,
       scene: ["灯会庭院", "Lantern courtyard"], description: ["舞狮准备、行走与两套表演动作", "Lion Dance stance, steps and two routines"], actions: [
