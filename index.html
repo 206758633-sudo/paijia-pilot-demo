@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>派加 Pilot · 手机横屏应用演示 V25</title>
+  <title>派加 Pilot · 手机横屏应用演示 V26</title>
   <style>
     :root {
       color-scheme: dark;
@@ -283,6 +283,86 @@
     }
     .minimap figcaption { left: 6px; }
     .map-north { right: 6px; color: var(--muted); }
+    .pilot-tools {
+      position: absolute;
+      z-index: 6;
+      top: var(--map-inset);
+      left: calc(var(--map-inset) + var(--map-width) + 8px);
+      right: 112px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      pointer-events: none;
+    }
+    .pilot-tools button {
+      min-height: 32px;
+      padding-inline: 9px;
+      font-size: 11px;
+      font-weight: 650;
+      background: var(--hud);
+      color: var(--text);
+      pointer-events: auto;
+    }
+    .pilot-tools button[aria-pressed="true"] { border-color: var(--accent); }
+    .phone-screen:has(.alert-line:not([hidden])) .pilot-tools { top: calc(var(--map-inset) + 29px); }
+    .touch-controls {
+      position: absolute;
+      z-index: 7;
+      inset: 47% 23% auto 23%;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      transform: translateY(-32%);
+      pointer-events: none;
+    }
+    .touch-controls > div {
+      padding: 5px 7px;
+      border: 1px solid #ffffff45;
+      border-radius: 12px;
+      background: var(--hud);
+      text-align: center;
+      font-size: 11px;
+      color: var(--text);
+    }
+    .touch-controls .stick { width: clamp(44px, 8cqw, 78px); margin-bottom: 3px; pointer-events: auto; }
+    .touch-controls .knob { inset: calc(50% - 9px) auto auto calc(50% - 9px); width: 18px; height: 18px; }
+    .flow-actions, .library-tools, .flow-heading, .flow-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+    .flow-heading { justify-content: space-between; padding-right: 64px; margin-bottom: 9px; }
+    .flow-actions button, .library-tools button { min-height: 32px; }
+    .flow-actions .form-status { flex: 1 1 175px; margin: 0; }
+    .library-tools span { color: var(--app-muted); font-size: 11px; }
+    .flow-grid { gap: 9px; }
+    .flow-choice, .flow-card {
+      border: 1px solid var(--app-control-line);
+      border-radius: 9px;
+      background: var(--app-surface);
+      padding: 8px 10px;
+    }
+    .flow-choice { flex: 1 1 140px; font-size: 13px; font-weight: 650; }
+    .flow-choice input { accent-color: var(--app-accent); }
+    .flow-choice small, .flow-card small { display: block; margin-top: 2px; color: var(--app-muted); font-weight: 400; }
+    .flow-choice:has(input:checked), .app-panel button.flow-card[aria-pressed="true"] { border-color: var(--app-accent); background: var(--app-selection); }
+    .flow-card { text-align: left; }
+    .app-panel h3.agent-action-heading { margin-top: 11px; }
+    .flow-fields { display: flex; gap: 8px; flex-wrap: wrap; margin-block: 9px; align-items: end; }
+    .flow-fields label { display: grid; gap: 3px; color: var(--app-muted); font-size: 11px; }
+    .flow-fields :is(input, select) {
+      min-height: 34px;
+      min-width: 0;
+      max-width: 100%;
+      padding: 4px 7px;
+      border: 1px solid var(--app-control-line);
+      border-radius: 6px;
+      background: var(--app-surface);
+      color: var(--app-ink);
+    }
+    .flow-fields button { min-height: 34px; }
+    .sequence-steps { margin-block: 8px; padding-inline-start: 24px; }
+    .sequence-steps li { margin-block: 3px; }
+    .sequence-steps button { min-height: 28px; padding-inline: 7px; margin-inline-start: 5px; }
+    .nearby-devices .flow-actions { justify-content: flex-end; }
+    .nearby-devices .flow-actions button { min-height: 27px; padding-inline: 6px; font-size: 11px; }
+    #scan-status { margin: 2px 0 4px; }
     .feed, .feed-shade { position: absolute; width: 100%; height: 100%; inset: 0; }
     .feed { display: block; width: calc(100% * 2 / 3); object-fit: cover; }
     #camera-footage { object-fit: contain; }
@@ -896,6 +976,17 @@
         .phone-screen > .phone-estop { left: calc(var(--map-inset) + var(--map-width) + 6px); }
       }
     }
+    @container (max-width: 800px) {
+      .pilot-tools { left: var(--warning-left); }
+      .pilot-tools .inline-agent-actions { display: none; }
+    }
+    @container (max-width: 580px) {
+      .pilot-tools { right: 5px; }
+      .pilot-tools button { min-height: 29px; padding-inline: 5px; font-size: 10px; }
+      .phone-screen:has(.pilot-tools) .observer-view figcaption { display: none; }
+      .touch-controls { inset-inline: 20% 13%; }
+      .touch-controls > div { padding: 3px 4px; font-size: 9px; }
+    }
     @container (max-width: 490px) {
       .hud-top { gap: 4px; padding: 0 3px; }
       .app-nav button:not(.swap-views) { padding-inline: 6px; }
@@ -937,6 +1028,9 @@
       .nearby-devices { order: -1; }
     }
     @container (max-width: 360px) {
+      .touch-controls { top: 48%; transform: translateY(-50%); }
+      .touch-controls > div { padding: 1px 3px; }
+      .touch-controls .stick { margin-bottom: 1px; }
       .telemetry { font-size: 9px; }
       .telemetry .motion { display: flex; align-items: baseline; gap: 4px; font-size: 12px; }
       .telemetry .motion strong { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1081,6 +1175,16 @@
                 <figcaption id="observer-caption">仿真动作演示</figcaption>
               </figure>
               <p class="alert-line" id="warn-banner" role="status" hidden></p>
+              <div class="pilot-tools" aria-label="场景和输入方式">
+                <button id="btn-open-agents" type="button" aria-controls="agent-panel">Agent · 基础</button>
+                <button id="btn-touch-controls" type="button" aria-pressed="false" aria-controls="touch-controls">触屏操控</button>
+                <span class="inline-agent-actions" id="inline-agent-actions" aria-label="场景快捷动作"></span>
+                <button id="btn-stop-sequence" type="button" hidden>停止编排</button>
+              </div>
+              <div class="touch-controls" id="touch-controls" role="group" aria-label="手机触屏双摇杆" hidden>
+                <div><div class="stick" id="touch-pad-left" role="img" aria-label="手机移动摇杆"><span class="knob" id="touch-knob-left"></span></div>移动</div>
+                <div><div class="stick" id="touch-pad-right" role="img" aria-label="手机转向摇杆"><span class="knob" id="touch-knob-right"></span></div>转向</div>
+              </div>
               <div class="emergency" id="estop-notice" role="status" hidden>
                 <strong>机器人急停已确认</strong>
                 <span>请在虚拟手柄上解除</span>
@@ -1123,7 +1227,42 @@
                 </select>
                 <button id="btn-close-actions" type="button">返回</button>
               </header>
+              <div class="library-tools" aria-label="动作编排与更新">
+                <button id="btn-open-sequence" type="button">动作编排</button>
+                <button id="btn-catalog-update" type="button">检查更新</button>
+                <span id="catalog-status" role="status">演示目录 1.0</span>
+              </div>
               <div class="library-list" id="action-list"></div>
+            </section>
+            <section class="app-panel app-page" id="agent-panel" aria-labelledby="agent-panel-title" hidden>
+              <header class="flow-heading">
+                <h2 id="agent-panel-title" tabindex="-1">切换 Agent</h2>
+                <button id="btn-close-agents" type="button">返回操控台</button>
+              </header>
+              <div class="flow-grid" id="agent-scenes" aria-label="可选 Agent">
+                <button class="flow-card" data-agent="standard" type="button" aria-pressed="true">基础操控<small>移动、转向与待命</small></button>
+                <button class="flow-card" data-agent="dance" type="button" aria-pressed="false">舞蹈演示<small>从快捷区点选派加舞蹈</small></button>
+              </div>
+              <h3 class="agent-action-heading">快捷动作</h3>
+              <p class="panel-note" id="agent-context" role="status"></p>
+              <div class="flow-actions" id="agent-actions"></div>
+            </section>
+            <section class="app-panel app-page" id="sequence-panel" aria-labelledby="sequence-panel-title" hidden>
+              <header class="flow-heading">
+                <h2 id="sequence-panel-title" tabindex="-1">动作编排</h2>
+                <button id="btn-close-sequence" type="button">返回动作库</button>
+              </header>
+              <div class="flow-fields">
+                <label>编排名称 <input id="sequence-name" maxlength="26" placeholder="客厅热身"></label>
+                <label>添加预设片段 <select id="sequence-action"></select></label>
+                <button id="btn-add-sequence-step" type="button">添加片段</button>
+              </div>
+              <ol class="sequence-steps" id="sequence-steps" aria-label="编排顺序"></ol>
+              <div class="flow-actions">
+                <button id="btn-save-sequence" type="button">保存到本浏览器</button>
+                <button class="primary-action" id="btn-preview-sequence" type="button">预览编排</button>
+              </div>
+              <p class="form-status" id="sequence-status" role="status">用已有动作片段演示示教编排。</p>
             </section>
             <section class="capture-gallery app-page" id="capture-gallery" aria-labelledby="capture-gallery-title" hidden>
               <header class="gallery-head">
@@ -1162,15 +1301,42 @@
                     </div>
                   </section>
                   <section class="nearby-devices" aria-labelledby="nearby-title">
-                    <header class="section-heading"><h3 id="nearby-title">可连接设备</h3><span class="section-count" id="nearby-count"></span></header>
+                    <header class="section-heading"><h3 id="nearby-title">可连接设备</h3><div class="flow-actions"><span class="section-count" id="nearby-count"></span><button id="btn-discover-robots" type="button">发现附近设备</button></div></header>
+                    <p class="panel-note" id="scan-status" role="status" hidden></p>
                     <div class="robot-grid" id="robot-options" role="group" aria-label="可连接的模拟机器人"></div>
                   </section>
                 </div>
               </div>
               <footer class="connection-footer">
                 <button id="btn-disconnect-robot" type="button">断开连接</button>
+                <button id="btn-configure-robot" type="button">配网连接</button>
                 <button id="btn-connect-robot" class="primary-action" type="button">连接所选机器人</button>
               </footer>
+            </section>
+            <section class="app-panel app-page" id="pairing-panel" aria-labelledby="pairing-panel-title" hidden>
+              <header class="flow-heading">
+                <h2 id="pairing-panel-title" tabindex="-1">选择连接方式</h2>
+                <button id="btn-close-pairing" type="button">返回设备列表</button>
+              </header>
+              <p class="panel-note" id="pairing-device"></p>
+              <form id="pairing-form">
+                <div class="flow-grid" role="group" aria-label="模拟连接方式">
+                  <label class="flow-choice"><input type="radio" name="pairing-mode" value="wifi" checked> Wi-Fi 配网<small>选择演示局域网</small></label>
+                  <label class="flow-choice"><input type="radio" name="pairing-mode" value="direct"> 热点直连<small id="pairing-hotspot">连接机器人演示热点</small></label>
+                </div>
+                <div class="flow-fields" id="pairing-wifi-fields">
+                  <label>演示网络
+                    <select id="pairing-network"><option value="lab">派加实验室</option><option value="open">派加开放网络</option></select>
+                  </label>
+                  <label id="pairing-password-field">演示密码
+                    <input id="pairing-password" type="password" autocomplete="off" placeholder="demo1234">
+                  </label>
+                </div>
+                <div class="flow-actions">
+                  <button class="primary-action" id="btn-submit-pairing" type="submit">开始模拟连接</button>
+                  <p class="form-status" id="pairing-status" role="status"></p>
+                </div>
+              </form>
             </section>
             <section class="app-panel app-page" id="user-panel" aria-labelledby="user-panel-title" hidden>
               <header class="panel-heading">
@@ -1275,7 +1441,24 @@
     const localVideoInput = element('local-video-input');
     const robotPanel = element('robot-panel');
     const userPanel = element('user-panel');
-    const appPages = { cockpit: element('hud-screen'), robots: robotPanel, profile: userPanel, actions: actionLibrary, captures: captureGallery };
+    const appPages = { cockpit: element('hud-screen'), robots: robotPanel, profile: userPanel, actions: actionLibrary, captures: captureGallery,
+      pairing: element('pairing-panel'), agents: element('agent-panel'), sequence: element('sequence-panel') };
+    const touchControls = element('touch-controls');
+    const touchToggle = element('btn-touch-controls');
+    const agentPicker = element('btn-open-agents');
+    const inlineAgentActions = element('inline-agent-actions');
+    const agentActions = element('agent-actions');
+    const pairingForm = element('pairing-form');
+    const pairingPassword = element('pairing-password');
+    const pairingNetwork = element('pairing-network');
+    const pairingStatus = element('pairing-status');
+    const configureRobot = element('btn-configure-robot');
+    const discoverRobots = element('btn-discover-robots');
+    const sequenceName = element('sequence-name');
+    const sequenceAction = element('sequence-action');
+    const sequenceSteps = element('sequence-steps');
+    const sequenceStatus = element('sequence-status');
+    const stopSequenceButton = element('btn-stop-sequence');
     const robotOptions = element('robot-options');
     const connectRobotButton = element('btn-connect-robot');
     const disconnectRobotButton = element('btn-disconnect-robot');
@@ -1317,7 +1500,8 @@
       { id: 26, name: '横向太空滑步舞', category: '舞蹈', start: 89.5, end: 96.5, level: 2 },
       { id: 27, name: '小鸡舞', category: '舞蹈', start: 96.5, end: 102.5, level: 2 },
       { id: 28, name: '魔性律动热舞', category: '舞蹈', start: 102.5, end: 109.5, level: 2 },
-      { id: 29, name: '骑马舞', category: '舞蹈', start: 109.5, end: 118.8, level: 2 }
+      { id: 29, name: '骑马舞', category: '舞蹈', start: 109.5, end: 118.8, level: 2 },
+      { id: 30, name: '滑步选段', category: '舞蹈', start: 89.5, end: 92.5, level: 2, updateOnly: true }
     ];
     const clips = {
       idle: { name: '待命', start: 52, end: 56.5, repeat: true },
@@ -1349,6 +1533,12 @@
       { clip: 27, duration: 6400, key: '小鸡舞' },
       { clip: 'idle', duration: 1800, key: '备战' }
     ];
+    const agentScenes = {
+      standard: { name: '基础', actions: ['idle'] },
+      dance: { name: '舞蹈', actions: [27, 29, 26] }
+    };
+    const sequenceMedia = [27, 29, 26, 28];
+    const linkNames = { handset: '手柄链路', wifi: 'Wi-Fi', direct: '热点直连' };
     const robotDevices = new Map([
       { id: 'PJ-01', name: '派加训练机', area: '训练室', battery: 86, bound: true, estop: false },
       { id: 'PJ-02', name: '派加展演机', area: '演示场', battery: 68, bound: false, estop: false },
@@ -1361,12 +1551,17 @@
       command: clips.idle.name, input: '等待输入', inputSource: '手柄', receipt: '就绪', pending: null,
       sticks: { left: [0, 0], right: [0, 0] },
       media: 'loading', cameraMode: 'simulation', cameraMedia: 'loading',
-      robotId: 'PJ-01', selectedRobotId: 'PJ-01', connectingRobotId: null, signedIn: false
+      robotId: 'PJ-01', selectedRobotId: 'PJ-01', connectingRobotId: null, signedIn: false,
+      linkMethod: 'handset', connectingMethod: null, agent: 'standard', catalogUpdated: false
     };
     const cameraPose = { x: 0, z: -0.7, yaw: 0 };
     const movementBounds = { minX: -2.3, maxX: 2.3, minZ: -2.6, maxZ: 3.0 };
     let lastMapPose = null;
     let lastTrailPoint = null;
+    let discoveryTimer = 0;
+    let sequenceRun = null;
+    const sequenceStorageKey = 'paijia-pilot-sequence-v1';
+    const sequenceDraft = loadSequenceDraft();
     const heldKeys = new Set();
     const pointerSticks = { left: null, right: null };
     let directionalPad = null;
@@ -1498,7 +1693,152 @@
     }
 
     function hasPhoneRobotLink() {
-      return state.connected && state.robotId !== null;
+      return state.robotId !== null && (state.connected || state.linkMethod !== 'handset');
+    }
+
+    function renderPairing() {
+      const choice = robotDevices.get(state.selectedRobotId);
+      const connecting = Boolean(state.connectingRobotId);
+      const wifi = pairingForm.elements['pairing-mode'].value === 'wifi';
+      setText(element('pairing-device'), choice.name + ' · ' + choice.id + ' · 模拟连接');
+      setText(element('pairing-hotspot'), '演示热点 ' + choice.id + '-Pilot');
+      element('pairing-wifi-fields').hidden = !wifi;
+      element('pairing-password-field').hidden = pairingNetwork.value === 'open';
+      for (const input of pairingForm.querySelectorAll('input, select, button')) input.disabled = connecting;
+      setText(element('btn-submit-pairing'), connecting ? '正在模拟连接…' : '开始模拟连接');
+    }
+
+    function openPairing() {
+      pairingForm.reset();
+      pairingPassword.value = '';
+      setText(pairingStatus, '请选择连接方式。');
+      renderPairing();
+      showAppPage('pairing', true);
+    }
+
+    function scanForRobots() {
+      const result = element('scan-status');
+      result.hidden = false;
+      setText(result, '正在扫描模拟附近设备…');
+      discoveryTimer = setTimeout(() => {
+        discoveryTimer = 0;
+        setText(result, '已发现 ' + robotDevices.size + ' 台模拟机器人。');
+        renderRobotControls();
+      }, 480);
+      renderRobotControls();
+    }
+
+    function actionUnavailable(motion) {
+      if (state.estop) return '急停中';
+      if (!hasPhoneRobotLink()) return '未连接';
+      return isActionRestricted(clips[motion]) ? '低电限制' : '';
+    }
+
+    function renderAgentControls() {
+      const agent = agentScenes[state.agent];
+      setText(agentPicker, 'Agent · ' + agent.name);
+      for (const button of element('agent-scenes').querySelectorAll('[data-agent]')) {
+        button.setAttribute('aria-pressed', String(button.dataset.agent === state.agent));
+      }
+      setText(element('agent-context'), '当前 Agent · ' + agent.name + (hasPhoneRobotLink() ? '' : ' · 请先连接机器人'));
+      for (const [host, motions] of [[inlineAgentActions, agent.actions.slice(0, 1)], [agentActions, agent.actions]]) {
+        if (host.dataset.agent !== state.agent) {
+          host.replaceChildren(...motions.map(motion => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.agentAction = motion;
+            button.textContent = clips[motion].name;
+            return button;
+          }));
+          host.dataset.agent = state.agent;
+        }
+        for (const button of host.children) {
+          const motion = button.dataset.agentAction;
+          const reason = actionUnavailable(motion);
+          button.disabled = Boolean(reason);
+          setText(button, clips[motion].name + (reason ? ' · ' + reason : ''));
+        }
+      }
+    }
+
+    function setTouchControls(open) {
+      touchControls.hidden = !open;
+      touchToggle.setAttribute('aria-pressed', String(open));
+      setText(touchToggle, open ? '收起摇杆' : '触屏操控');
+      if (open) return;
+      let released = false;
+      for (const side of ['left', 'right']) {
+        if (pointerSticks[side]?.source !== '手机触屏') continue;
+        pointerSticks[side] = null;
+        released = true;
+      }
+      if (released && !state.estop) updateManualSticks('手机触屏');
+    }
+
+    function loadSequenceDraft() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(sequenceStorageKey));
+        if (typeof saved?.name === 'string' && Array.isArray(saved.steps)) {
+          return { name: saved.name.slice(0, 26), steps: saved.steps.filter(id => sequenceMedia.includes(id)).slice(0, 8) };
+        }
+      } catch { /* The editor remains available when browser storage is unavailable. */ }
+      return { name: '', steps: [] };
+    }
+
+    function renderSequence() {
+      sequenceSteps.replaceChildren(...sequenceDraft.steps.map((motion, index) => {
+        const row = document.createElement('li');
+        row.append(clips[motion].name);
+        for (const [operation, label, disabled] of [
+          ['up', '上移', index === 0], ['down', '下移', index === sequenceDraft.steps.length - 1], ['remove', '删除', false]
+        ]) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = label;
+          button.dataset.stepOperation = operation;
+          button.dataset.stepIndex = index;
+          button.disabled = disabled;
+          row.append(button);
+        }
+        return row;
+      }));
+      element('btn-add-sequence-step').disabled = sequenceDraft.steps.length >= 8;
+      updateSequenceControls();
+    }
+
+    function updateSequenceControls() {
+      const blocked = sequenceDraft.steps.some(motion => actionUnavailable(motion));
+      element('btn-save-sequence').disabled = !sequenceDraft.steps.length;
+      element('btn-preview-sequence').disabled = !sequenceDraft.steps.length || blocked;
+      stopSequenceButton.hidden = !sequenceRun;
+    }
+
+    function cancelSequence(message) {
+      if (!sequenceRun) return;
+      sequenceRun = null;
+      setText(sequenceStatus, message);
+      updateSequenceControls();
+    }
+
+    function playSequenceStep() {
+      const motion = sequenceRun.steps[sequenceRun.index];
+      if (actionUnavailable(motion)) {
+        state.receipt = '编排已中断 · ' + actionUnavailable(motion);
+        cancelSequence(state.receipt);
+        return;
+      }
+      const step = (sequenceRun.index + 1) + '/' + sequenceRun.steps.length;
+      requestMotion(motion, sequenceRun.name + ' · ' + step + ' · ' + clips[motion].name, '手机动作编排');
+    }
+
+    function startSequence() {
+      if (!sequenceDraft.steps.length || sequenceDraft.steps.some(motion => actionUnavailable(motion))) return;
+      setMode('manual');
+      resetInputs();
+      sequenceRun = { name: sequenceName.value.trim() || '未命名编排', steps: [...sequenceDraft.steps], index: 0 };
+      showAppPage('cockpit', true);
+      updateSequenceControls();
+      playSequenceStep();
     }
 
     function activeRobotLabel() {
@@ -1542,20 +1882,22 @@
         setText(card.status, robot.bound ? linkStatus + ' · 已绑定' : linkStatus);
       }
       connectRobotButton.disabled = !state.connected || Boolean(connecting) || linked === selected;
+      configureRobot.disabled = Boolean(connecting);
+      discoverRobots.disabled = Boolean(connecting) || Boolean(discoveryTimer);
       disconnectRobotButton.disabled = !linked && !connecting;
       setText(connectRobotButton, connecting ? '正在连接' : linked === selected ? '已连接所选机器人' : linked ? '切换到所选机器人' : '连接所选机器人');
       setText(disconnectRobotButton, connecting ? '取消连接' : '断开连接');
       let status = 'Type-C 已接入 · 等待选择机器人';
       let shortStatus = '未连接';
-      if (!state.connected) {
-        status = 'Type-C 已断开 · 请先插入连接线';
-        shortStatus = '手机离线';
-      } else if (connecting) {
+      if (connecting) {
         status = '正在连接 ' + robotDevices.get(connecting).name;
         shortStatus = connecting + ' 连接中';
-      } else if (active) {
-        status = '已连接 ' + activeRobotLabel() + (active.estop ? ' · 已急停' : '');
+      } else if (active && hasPhoneRobotLink()) {
+        status = '已连接 ' + activeRobotLabel() + (state.linkMethod === 'handset' ? '' : ' · ' + linkNames[state.linkMethod] + ' 模拟') + (active.estop ? ' · 已急停' : '');
         shortStatus = linked + ' 已连接';
+      } else if (!state.connected) {
+        status = 'Type-C 已断开 · 可在配网连接选择无线方式';
+        shortStatus = '手机离线';
       }
       setText(element('app-current-robot'), shortStatus);
       setText(element('robot-link-summary'), status);
@@ -1625,9 +1967,15 @@
     function showAppPage(page, focus = false) {
       const changingPage = appPage !== page;
       const showCockpit = page === 'cockpit';
+      if (appPage === 'pairing' && changingPage) {
+        pairingPassword.value = '';
+        if (state.connectingRobotId) disconnectRobot();
+      }
+      if (!showCockpit) setTouchControls(false);
       appPage = page;
       for (const [name, view] of Object.entries(appPages)) view.hidden = name !== page;
-      const appNavPage = page === 'actions' ? actionReturnPage : page === 'captures' ? albumReturnPage : page;
+      const navPages = { actions: actionReturnPage, captures: albumReturnPage, sequence: actionReturnPage, pairing: 'robots', agents: 'cockpit' };
+      const appNavPage = navPages[page] || page;
       element('nav-cockpit').setAttribute('aria-pressed', String(appNavPage === 'cockpit'));
       element('nav-robots').setAttribute('aria-pressed', String(appNavPage === 'robots'));
       element('nav-profile').setAttribute('aria-pressed', String(appNavPage === 'profile'));
@@ -1649,6 +1997,7 @@
 
     function disconnectRobot(message = '机器人已断开，正在保存已录片段。') {
       clearTimeout(robotConnectTimer);
+      cancelSequence('编排已中断 · 机器人断开');
       const previous = robotDevices.get(state.robotId);
       if (previous) {
         previous.battery = state.battery;
@@ -1659,6 +2008,8 @@
       cameraFootage.pause();
       state.robotId = null;
       state.connectingRobotId = null;
+      state.connectingMethod = null;
+      state.linkMethod = 'handset';
       state.estop = false;
       state.pending = null;
       setMode('manual');
@@ -1667,16 +2018,20 @@
       renderStatus();
     }
 
-    function connectSelectedRobot() {
+    function connectSelectedRobot(method = 'handset') {
       const robot = robotDevices.get(state.selectedRobotId);
-      if (!state.connected || state.connectingRobotId || robot.id === state.robotId) return;
+      if (state.connectingRobotId || (method === 'handset' && (!state.connected || robot.id === state.robotId))) return;
       disconnectRobot('正在切换机器人，已结束当前录像。');
       state.connectingRobotId = robot.id;
+      state.connectingMethod = method;
       renderStatus();
       robotConnectTimer = setTimeout(() => {
-        if (!state.connected || state.connectingRobotId !== robot.id) return;
+        if (state.connectingRobotId !== robot.id || (method === 'handset' && !state.connected)) return;
         state.robotId = robot.id;
         state.connectingRobotId = null;
+        state.connectingMethod = null;
+        state.linkMethod = method;
+        state.agent = 'standard';
         state.battery = robot.battery;
         state.estop = robot.estop;
         state.command = robot.estop ? '急停' : '待命';
@@ -1691,6 +2046,7 @@
         beginMotion('idle', now());
         if (robot.estop && video.readyState >= 1) video.currentTime = clips.idle.start + 0.03;
         drawRobotCamera(now());
+        if (method !== 'handset') showAppPage('cockpit', true);
         renderStatus();
       }, 650);
     }
@@ -1732,6 +2088,7 @@
 
     function setMode(mode) {
       if (mode === state.mode || (mode === 'auto' && (!state.robotId || state.estop))) return;
+      cancelSequence('编排已中断 · 切换演示方式');
       resetInputs();
       state.mode = mode;
       state.pending = null;
@@ -1745,6 +2102,7 @@
 
     function requestMotion(motion, input, source = '手柄') {
       if (!state.robotId || state.estop) return;
+      if (source !== '手机动作编排') cancelSequence('编排已中断 · 收到新指令');
       state.command = clips[motion].name;
       state.input = input;
       state.inputSource = source;
@@ -1767,7 +2125,7 @@
 
     function renderActionLibrary() {
       const category = actionCategory.value;
-      const visibleActions = actionCatalog.filter(action => category === 'all' || action.category === category);
+      const visibleActions = actionCatalog.filter(action => (!action.updateOnly || state.catalogUpdated) && (category === 'all' || action.category === category));
       const fragment = document.createDocumentFragment();
       for (const action of visibleActions) {
         const item = document.createElement('button');
@@ -1786,10 +2144,9 @@
     }
 
     function updateLibraryAvailability() {
-      const unavailable = state.estop ? '急停中' : !hasPhoneRobotLink() ? '未连接' : '';
       for (const item of actionList.children) {
         const action = clips[item.dataset.libraryAction];
-        const reason = unavailable || (isActionRestricted(action) ? '低电限制' : '');
+        const reason = actionUnavailable(item.dataset.libraryAction);
         item.disabled = Boolean(reason);
         setText(item.lastElementChild, reason || 'S' + action.level);
       }
@@ -1819,6 +2176,7 @@
     function triggerEstop(source) {
       if (!state.robotId || state.estop) return;
       if (source === '手机' && !hasPhoneRobotLink()) return;
+      cancelSequence('编排已中断 · 急停');
       setMode('manual');
       resetInputs();
       state.pending = null;
@@ -1882,6 +2240,7 @@
       state.pending = null;
       if (isActionRestricted(clips[requested])) {
         state.receipt = '已拒绝 · 低电量限制';
+        cancelSequence('编排已中断 · 低电限制');
         return;
       }
       state.receipt = requested === 'idle' ? '已待命' : '已接收 · 执行中';
@@ -1908,6 +2267,14 @@
       if (!clip.repeat && time - state.motionAt >= (clip.end - clip.start) * 1000) {
         state.receipt = '动作已完成';
         beginMotion('idle', time);
+        if (sequenceRun) {
+          sequenceRun.index += 1;
+          if (sequenceRun.index < sequenceRun.steps.length) playSequenceStep();
+          else {
+            state.receipt = '动作编排已完成';
+            cancelSequence('动作编排已完成。');
+          }
+        }
       }
       if (clip.rotation) {
         const delta = Math.min(0.075, (time - previousTick) / 1000);
@@ -1945,45 +2312,49 @@
       return ['idle', '摇杆回中'];
     }
 
-    function updateManualSticks() {
+    function updateManualSticks(fallback = '手柄') {
       state.sticks.left = stickVector('left');
       state.sticks.right = stickVector('right');
       const [intent, source] = movementIntent(state.sticks.left, state.sticks.right);
       if (intent !== lastStickIntent) {
         lastStickIntent = intent;
         markInputKey('');
-        requestMotion(intent, intent === 'idle' ? source : source + ' · ' + clips[intent].name);
+        const side = source === '左杆' ? 'left' : 'right';
+        const inputSource = intent === 'idle' ? fallback : pointerSticks[side]?.source || fallback;
+        requestMotion(intent, intent === 'idle' ? source : source + ' · ' + clips[intent].name, inputSource);
       }
     }
 
-    function bindStick(side) {
-      const surface = element('pad-' + side);
+    function bindStick(side, surface = element('pad-' + side), source = '手柄') {
+      const touch = source === '手机触屏';
+      const ownsPointer = event => pointerSticks[side]?.surface === surface && pointerSticks[side].id === event.pointerId;
       function move(event) {
-        if (pointerSticks[side]?.id !== event.pointerId) return;
+        if (!ownsPointer(event)) return;
         const bounds = surface.getBoundingClientRect();
         const scale = bounds.width * 0.36;
         pointerSticks[side].vector = [
           (event.clientX - bounds.left - bounds.width / 2) / scale,
-          (bounds.top + bounds.height / 2 - event.clientY) / scale
+          touch && side === 'right' ? 0 : (bounds.top + bounds.height / 2 - event.clientY) / scale
         ];
-        updateManualSticks();
+        updateManualSticks(source);
       }
       surface.addEventListener('pointerdown', event => {
         if (!state.robotId || state.estop || event.button !== 0 || pointerSticks[side]) return;
+        if (touch && (!hasPhoneRobotLink() || touchControls.hidden)) return;
         const wasAuto = state.mode === 'auto';
         setMode('manual');
-        pointerSticks[side] = { id: event.pointerId, vector: [0, 0] };
+        pointerSticks[side] = { id: event.pointerId, vector: [0, 0], surface, source };
         surface.setPointerCapture(event.pointerId);
         move(event);
-        if (wasAuto && lastStickIntent === 'idle') requestMotion('idle', '摇杆回中');
+        if (wasAuto && lastStickIntent === 'idle') requestMotion('idle', '摇杆回中', source);
         syncVideo(false, true);
       });
       surface.addEventListener('pointermove', move);
       for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
         surface.addEventListener(type, event => {
-          if (pointerSticks[side]?.id !== event.pointerId) return;
+          if (!ownsPointer(event)) return;
           pointerSticks[side] = null;
-          updateManualSticks();
+          updateManualSticks(source);
         });
       }
     }
@@ -2006,6 +2377,11 @@
         const knob = element('knob-' + side);
         const position = 'translate(' + Math.round(x * 33) + 'px, ' + Math.round(-y * 33) + 'px)';
         if (knob.style.transform !== position) knob.style.transform = position;
+        if (!touchControls.hidden) {
+          const touchKnob = element('touch-knob-' + side);
+          const touchPosition = 'translate(' + Math.round(x * 13) + 'px, ' + Math.round(-y * 13) + 'px)';
+          if (touchKnob.style.transform !== touchPosition) touchKnob.style.transform = touchPosition;
+        }
         setText(element('stick-' + side + '-value'), 'X ' + Math.round(x * 100) + ' · Y ' + Math.round(y * 100));
       }
     }
@@ -2069,7 +2445,8 @@
       if (linked && Number(batterySlider.value) !== battery) batterySlider.value = battery;
       setText(element('sim-bat-readout'), linked ? battery + '%' : '—');
       setText(element('typec-status'), usb ? 'Type-C 已连' : 'Type-C 断开');
-      const wirelessStatus = connected ? '机器人链路正常' : state.connectingRobotId ? '正在连接机器人' : usb ? '未连接机器人' : '机器人链路待更新';
+      const connectedLabel = state.linkMethod === 'handset' ? '机器人链路正常' : linkNames[state.linkMethod] + ' · 模拟已连';
+      const wirelessStatus = connected ? connectedLabel : state.connectingRobotId ? '正在连接机器人' : usb ? '未连接机器人' : '机器人链路待更新';
       hudTop.classList.toggle('linked', connected);
       setText(element('wireless-status'), wirelessStatus);
       setText(element('phone-body-battery'), bodyBattery);
@@ -2091,7 +2468,7 @@
       let feedMessage = '正在加载画面';
       let feedHint = usingFootage ? '正在读取机器人相机录像' : '正在加载模拟客厅';
       let videoStatus = '加载中';
-      if (!usb) {
+      if (!usb && !connected && !state.connectingRobotId) {
         feedMessage = 'Type-C 已断开';
         feedHint = linked ? '重插 Type-C 恢复显示，急停请使用手柄' : '重插 Type-C 后选择机器人';
         videoStatus = '已断开';
@@ -2126,6 +2503,8 @@
       setText(element('btn-estop'), state.estop ? '解除急停' : '急停');
       element('btn-estop').disabled = !linked;
       phoneEstop.disabled = !connected || state.estop;
+      touchToggle.disabled = !connected || state.estop;
+      if (touchToggle.disabled && !touchControls.hidden) setTouchControls(false);
       phoneEstop.classList.toggle('estopped', connected && state.estop);
       setText(phoneEstopLabel, connected && state.estop ? '已急停' : '急停');
       phoneEstop.title = connected ? '手机急停，使用手柄解除' : linked ? '手机离线，请使用手柄急停' : '请先连接机器人';
@@ -2143,6 +2522,9 @@
       setText(observerStatus, state.media === 'failed' ? '动作素材不可用' : video.seeking ? '正在同步动作' : '动作素材加载中');
       element('local-video-note').hidden = !usingFootage;
       renderRobotControls();
+      if (appPage === 'pairing') renderPairing();
+      renderAgentControls();
+      updateSequenceControls();
       renderTelemetry();
       renderCapture();
     }
@@ -2372,9 +2754,14 @@
       if (state.connected) {
         syncVideo(true);
         playCameraFootage();
-      } else if (state.connectingRobotId) {
+      } else if (state.connectingRobotId && state.connectingMethod === 'handset') {
         disconnectRobot();
-      } else {
+      } else if (state.linkMethod === 'handset' && !state.connectingRobotId) {
+        if (sequenceRun) {
+          cancelSequence('编排已中断 · Type-C 断开');
+          state.pending = null;
+          beginMotion('idle', now());
+        }
         video.pause();
         cameraFootage.pause();
         stopRecording('Type-C 已断开，正在保存已录片段。');
@@ -2389,6 +2776,7 @@
       robotDevices.get(state.robotId).battery = state.battery;
       if (!state.estop && isActionRestricted(clips[state.motion])) {
         state.receipt = '动作中断 · 低电量限制';
+        cancelSequence('编排已中断 · 低电限制');
         beginMotion('idle', now());
       }
       if (!actionLibrary.hidden && wasLimited !== (state.battery <= 20)) renderActionLibrary();
@@ -2433,8 +2821,97 @@
       state.selectedRobotId = event.target.value;
       renderRobotControls();
     });
-    connectRobotButton.addEventListener('click', connectSelectedRobot);
+    connectRobotButton.addEventListener('click', () => connectSelectedRobot());
     disconnectRobotButton.addEventListener('click', () => disconnectRobot());
+    discoverRobots.addEventListener('click', scanForRobots);
+    configureRobot.addEventListener('click', openPairing);
+    element('btn-close-pairing').addEventListener('click', () => showAppPage('robots', true));
+    pairingForm.addEventListener('change', event => {
+      if (event.target === pairingPassword) return;
+      pairingPassword.value = '';
+      setText(pairingStatus, '请选择连接方式。');
+      renderPairing();
+    });
+    pairingForm.addEventListener('submit', event => {
+      event.preventDefault();
+      if (state.connectingRobotId) return;
+      const method = pairingForm.elements['pairing-mode'].value;
+      if (method === 'wifi' && pairingNetwork.value === 'lab' && pairingPassword.value !== 'demo1234') {
+        pairingPassword.value = '';
+        setText(pairingStatus, '模拟连接失败。请使用演示密码 demo1234 后重试。');
+        pairingPassword.focus();
+        return;
+      }
+      pairingPassword.value = '';
+      setText(pairingStatus, '正在建立 ' + linkNames[method] + ' 模拟链路…');
+      connectSelectedRobot(method);
+    });
+    agentPicker.addEventListener('click', () => showAppPage('agents', true));
+    element('btn-close-agents').addEventListener('click', () => showAppPage('cockpit', true));
+    element('agent-scenes').addEventListener('click', event => {
+      const card = event.target.closest('[data-agent]');
+      if (!card) return;
+      state.agent = card.dataset.agent;
+      renderAgentControls();
+    });
+    for (const host of [agentActions, inlineAgentActions]) {
+      host.addEventListener('click', event => {
+        const button = event.target.closest('[data-agent-action]');
+        if (!button || button.disabled) return;
+        const motion = button.dataset.agentAction === 'idle' ? 'idle' : Number(button.dataset.agentAction);
+        if (actionUnavailable(motion)) return;
+        showAppPage('cockpit', true);
+        choosePreset(motion, '', '手机 Agent');
+      });
+    }
+    touchToggle.addEventListener('click', () => setTouchControls(touchControls.hidden));
+    element('btn-open-sequence').addEventListener('click', () => {
+      renderSequence();
+      showAppPage('sequence', true);
+    });
+    element('btn-close-sequence').addEventListener('click', () => showAppPage('actions', true));
+    element('btn-add-sequence-step').addEventListener('click', () => {
+      sequenceDraft.steps.push(Number(sequenceAction.value));
+      renderSequence();
+    });
+    sequenceSteps.addEventListener('click', event => {
+      const button = event.target.closest('[data-step-operation]');
+      if (!button || button.disabled) return;
+      const index = Number(button.dataset.stepIndex);
+      const operation = button.dataset.stepOperation;
+      const [motion] = sequenceDraft.steps.splice(index, 1);
+      if (operation !== 'remove') sequenceDraft.steps.splice(index + (operation === 'up' ? -1 : 1), 0, motion);
+      renderSequence();
+    });
+    element('btn-save-sequence').addEventListener('click', () => {
+      sequenceDraft.name = sequenceName.value.trim() || '未命名编排';
+      sequenceName.value = sequenceDraft.name;
+      try {
+        localStorage.setItem(sequenceStorageKey, JSON.stringify(sequenceDraft));
+        setText(sequenceStatus, '已保存「' + sequenceDraft.name + '」到本浏览器。');
+      } catch {
+        setText(sequenceStatus, '本浏览器无法保存。编排可在当前会话中预览。');
+      }
+    });
+    element('btn-preview-sequence').addEventListener('click', startSequence);
+    stopSequenceButton.addEventListener('click', () => {
+      cancelSequence('用户停止编排。');
+      requestMotion('idle', '停止编排', '手机动作编排');
+    });
+    element('btn-catalog-update').addEventListener('click', event => {
+      const button = event.currentTarget;
+      if (!button.dataset.available) {
+        button.dataset.available = 'true';
+        setText(button, '应用演示更新');
+        setText(element('catalog-status'), '演示版本 1.1 · 含滑步选段');
+        return;
+      }
+      state.catalogUpdated = true;
+      button.disabled = true;
+      setText(button, '已更新');
+      setText(element('catalog-status'), '演示目录 1.1');
+      renderActionLibrary();
+    });
     element('btn-demo-login').addEventListener('click', () => {
       setSignedIn(true);
       element('btn-demo-logout').focus({ preventScroll: true });
@@ -2524,6 +3001,8 @@
     });
     bindStick('left');
     bindStick('right');
+    bindStick('left', element('touch-pad-left'), '手机触屏');
+    bindStick('right', element('touch-pad-right'), '手机触屏');
     window.addEventListener('keydown', event => {
       if (event.code === 'Escape' && !demoSettings.hidden && event.target.closest?.('#demo-settings, #btn-demo-settings')) {
         setDemoSettingsOpen(false);
@@ -2538,7 +3017,11 @@
         setCaptureGalleryOpen(false);
         return;
       }
-      if (event.target.closest?.('input, select, video, dialog, #action-library, [contenteditable]') || !state.robotId || state.estop || event.repeat) return;
+      if (event.code === 'Escape' && appPage === 'pairing') { showAppPage('robots', true); return; }
+      if (event.code === 'Escape' && appPage === 'agents') { showAppPage('cockpit', true); return; }
+      if (event.code === 'Escape' && appPage === 'sequence') { showAppPage('actions', true); return; }
+      if (event.code === 'Escape' && !touchControls.hidden) { setTouchControls(false); return; }
+      if (event.target.closest?.('input, select, video, dialog, #action-library, #sequence-panel, #pairing-panel, [contenteditable]') || !state.robotId || state.estop || event.repeat) return;
       if (event.code === 'Space') {
         if (event.target.closest?.('button, summary')) return;
         event.preventDefault();
@@ -2647,6 +3130,9 @@
     homeScene.addEventListener('error', updateHomeCamera);
     if (typeof HOME_CAMERA_SCENE === 'string') homeScene.src = HOME_CAMERA_SCENE;
     buildRobotOptions();
+    sequenceName.value = sequenceDraft.name;
+    sequenceAction.replaceChildren(...sequenceMedia.map(motion => new Option(clips[motion].name, motion)));
+    renderSequence();
     updateHomeCamera();
     loadBundledVideo();
     requestAnimationFrame(tick);
