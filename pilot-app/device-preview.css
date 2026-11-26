@@ -100,8 +100,7 @@
     scrollbar-width:none;
   }
   #app::-webkit-scrollbar { display:none; }
-  .device-screen .shell,
-  .device-screen .console { min-height:100%; padding:0 var(--phone-gutter) 12px; }
+  .device-screen .shell { min-height:100%; padding:0 var(--phone-gutter) 12px; }
   .device-screen .bar { padding:6px 11px; min-height:49px; }
   .device-screen .wrap { padding:16px 11px 25px; }
   .device-screen .stack-lg { gap:14px; }
@@ -119,26 +118,12 @@
   .device-screen .tile { min-height:61px; padding:10px; }
   .device-screen .tile-title { font-size:15px; }
   .device-screen .symbol { height:34px; width:34px; font-size:17px; }
-  .device-screen .console { grid-template-rows:auto minmax(175px,1fr) auto; }
-  .device-screen .console-top,
-  .device-screen .console-bottom { padding:5px 8px; }
-  .device-screen .console .btn { min-height:34px; padding:5px 8px; font-size:13px; }
-  .device-screen .stage { margin-inline:0; }
-  .device-screen .sticks { bottom:8px; gap:25px; }
-  .device-screen .stick { width:clamp(62px,8vw,86px); }
-  .device-screen .stage-meter { bottom:124px; }
-  .device-screen .overlay { position:absolute; }
-  .device-screen .panel { max-height:calc(100% - 12px); }
   .device-screen .toast { position:absolute; bottom:17px; max-width:82%; }
 }
 
 @media (orientation:landscape) and (pointer:coarse) {
-  .bar, .wrap, .console-top, .console-bottom {
+  .bar, .wrap {
     padding-left:max(12px,env(safe-area-inset-left));
     padding-right:max(12px,env(safe-area-inset-right));
-  }
-  .stage {
-    margin-left:max(10px,env(safe-area-inset-left));
-    margin-right:max(10px,env(safe-area-inset-right));
   }
 }

@@ -17,7 +17,8 @@ const saved = load();
 const session = {
   page: saved.user ? "home" : "auth", register: false, connection: null, join: null,
   mode: "damp", agent: "base", camera: true, running: null, motion: {}, view: { x: 0, y: 0, scale: 1.07 },
-  group: null, teaching: null, calibration: null, dialog: "", error: "", update: null
+  group: null, teaching: null, calibration: null, dialog: "", error: "", update: null,
+  actionsExpanded: true, stoppedRobots: new Set()
 };
 
 let operationTimer;
@@ -117,13 +118,15 @@ function render() {
     window.scrollTo(0, 0);
     root.focus({ preventScroll: true });
   } else if (session.dialog && session.dialog !== priorDialog) {
-    root.querySelector('[role=dialog] button')?.focus();
+    (root.querySelector(".confirm-slider") || root.querySelector("[role=dialog] button"))?.focus();
+  } else if (priorDialog && !session.dialog) {
+    const opener = priorDialog.startsWith("mode-") ? '[data-action="mode"][data-value="' + priorDialog.slice(5) + '"]' :
+      priorDialog === "stop-release" ? '[data-action="emergency"]' : '[data-action="agent-picker"]';
+    root.querySelector(opener)?.focus({ preventScroll: true });
   } else if (focusedAction) {
     Array.from(root.querySelectorAll("button[data-action]")).find(item =>
       item.dataset.action === focusedAction && item.dataset.value === focusedValue
     )?.focus({ preventScroll: true });
-  } else if (priorDialog && !session.dialog) {
-    root.querySelector('[data-action="agent-picker"]')?.focus();
   }
   if (session.page === "control") updateMotion();
 }
@@ -350,12 +353,12 @@ function finishJoin(id, kind, succeeded, network = "") {
     session.agent = preferredAgent(robotById(id)).id;
     session.camera = true;
     session.mode = "damp";
+    session.actionsExpanded = true;
     session.view = { x: 0, y: 0, scale: 1.07 };
     route("control");
   }, 850);
 }
 
-const modes = ["damp", "ready", "walk"];
 const stickNames = () => ({ move: tr("全向行走", "Walk"), head: tr("头部转动", "Head"), turn: tr("机身转向", "Turn") });
 
 function compatible(agent, robot) {
@@ -371,52 +374,78 @@ function preferredAgent(robot) {
   return candidate && compatible(candidate, robot) && installed(robot, candidate) ? candidate : agentById("base");
 }
 
+function robotStopped() {
+  return session.stoppedRobots.has(session.connection?.id);
+}
+
 function activeActions() {
   const agent = getAgent();
   const robot = currentRobot();
+  if (session.mode !== "walk") {
+    return agent.id === "base" && robot.model === "K1" ? [
+      { id: "base-get-up", label: tr("起身", "Get up"), duration: 4, cancel: true, icon: "↑" }
+    ] : [];
+  }
   const builtin = agent.actions.map(([zh, en, duration, cancel], index) =>
-    ({ id: agent.id + "-" + index, label: tr(zh, en), duration, cancel }));
+    ({ id: agent.id + "-" + index, label: tr(zh, en), duration, cancel, icon: agent.id === "base" ? ["◔", "◇", "⌁", "✦"][index] : agent.icon }));
   const custom = saved.skills.filter(skill => skill.targets.includes(robot.id + "/" + agent.id)).map(skill =>
-    ({ id: skill.id, label: skill.name, duration: Math.max(3, skill.poses.length), cancel: true }));
+    ({ id: skill.id, label: skill.name, duration: Math.max(3, skill.poses.length), cancel: true, icon: skill.icon }));
   return [...builtin, ...custom];
 }
 
 function control() {
   const robot = currentRobot();
   const online = connected();
-  const adjustable = online && session.mode !== "damp" && !session.running && !session.dialog;
-  const enabled = online && session.mode === "walk" && !session.dialog;
+  const locked = !online || robotStopped();
+  const adjustable = !locked && !session.running && !session.dialog;
+  const canWalk = adjustable && session.mode === "walk";
   const showFeed = online && session.camera;
   const status = online ? tr("已连接", "Connected") + " · " + linkLabel(session.connection.kind) : tr("已掉线", "Connection lost");
-  const nextMode = session.mode === "damp" ? "ready" : session.mode === "ready" ? "walk" : null;
-  const names = stickNames();
-  return '<div class="console"><header class="console-top"><div class="row">' +
+  return '<section class="console"><div class="control-surface"' + (session.dialog ? " inert" : "") +
+    '><div class="stage' + (showFeed ? "" : " paused") + '" role="region" aria-label="' + tr("机器人图传", "Robot feed") +
+    '"><div class="feed"></div>' +
+    (!showFeed ? '<div class="stage-message"><span>' + (online ? tr("图传已暂停", "Feed paused") : tr("连接已中断", "Connection lost")) + "</span></div>" : "") +
+    '</div><header class="console-top"><div class="row">' +
     button(tr("‹ 设备", "‹ Devices"), "nav", "", { value: "home" }) +
     '<h1 class="console-title">' + tr("机器人操控台", "Robot controls") + "</h1>" +
-    button(agentLabel(getAgent()) + " ▾", "agent-picker", "", { disabled: !online }) +
+    button(agentLabel(getAgent()) + " ▾", "agent-picker", "agent-button", { disabled: !online }) +
+    '</div><div class="row control-device-tools">' +
     chip(robot.id) + chip(status, online ? "green" : "warm") + chip(robot.battery + "%") +
-    '</div><div class="row">' +
     button(showFeed ? tr("暂停图传", "Pause feed") : tr("打开图传", "Resume feed"), "camera", "", { disabled: !online }) +
     button(tr("设备设置", "Robot settings"), "nav", "", { value: "settings" }) +
-    '</div></header><section class="stage' + (showFeed ? "" : " paused") + '" aria-label="' + tr("机器人图传", "Robot feed") +
-    '"><div class="feed"></div><span class="pill feed-note">' + tr("模拟 · 前相机", "Simulation · Front camera") + "</span>" +
-    (!showFeed ? '<div class="stage-message"><span>' + (online ? tr("图传已暂停", "Feed paused") : tr("连接已中断", "Connection lost")) + "</span></div>" : "") +
-    '<output class="stage-meter" id="motion-output"></output><div class="sticks">' + Object.entries(names).map(([key, name]) =>
-      '<div class="stick-slot"><button type="button" class="stick" data-stick="' + key + '" aria-label="' + name +
-      '" aria-describedby="motion-output"' + ((key === "head" ? adjustable : adjustable && enabled) ? "" : " disabled") +
-      '><i aria-hidden="true"></i></button><span>' + name + "</span></div>"
-    ).join("") + '</div></section><footer class="console-bottom"><div class="row mode-controls" role="group" aria-label="' + tr("机器人模式", "Robot mode") + '">' +
-    (online ? modes.map(mode => button(modeLabel(mode), "mode", mode === nextMode ? "next-mode" : "", {
-      value: mode, pressed: selectedMode(mode), disabled: mode === "walk" && session.mode === "damp",
-      description: mode === nextMode ? "action-output" : undefined
+    (online ? button(robotStopped() ? tr("解除急停", "Release stop") : tr("急停", "Stop"), "emergency", "stop-button",
+      { value: robotStopped() ? "release" : "stop" }) : "") +
+    '</div></header><span class="pill feed-note">' + tr("模拟 · 前相机", "Simulation · Front camera") +
+    '</span><output class="stage-meter" id="motion-output"></output>' +
+    '<div class="sticks">' + Object.entries(stickNames()).map(([key, name]) =>
+      '<div class="stick-slot stick-' + key + '"><button type="button" class="stick" data-stick="' + key + '" aria-label="' + name +
+      '" aria-describedby="motion-output"' + ((key === "head" ? adjustable && session.mode !== "damp" : canWalk) ? "" : " disabled") +
+      '><i aria-hidden="true"></i></button><span aria-hidden="true">' + name + "</span></div>"
+    ).join("") + '</div><div class="mode-controls" role="group" aria-label="' + tr("机器人模式", "Robot mode") + '">' +
+    (online ? ["ready", "walk"].map(mode => button(modeLabel(mode), "mode", "mode-button", {
+      value: mode, pressed: selectedMode(mode),
+      disabled: locked || Boolean(session.running) || (mode === "walk" && session.mode === "damp"),
+      description: "action-output"
     })).join("") : button(tr("重新连接", "Reconnect"), "reconnect", "primary")) +
-    '</div><div class="action-area"><div class="row action-list" role="group" aria-label="' + tr("执行动作", "Run an action") + '">' + activeActions().map(action =>
-      button(action.label, "run", "", { value: action.id, pressed: session.running?.action.id === action.id,
-        disabled: !enabled || (session.running && session.running.action.id !== action.id) })
-    ).join("") + (session.agent === "teach" ? button(tr("打开示教", "Open teaching"), "begin-teach") : "") +
-    (session.agent === "talk" ? button(tr("模拟对话", "Simulated conversation"), "open-chat", "", { disabled: !online }) : "") +
-    '</div><p class="caption" id="action-output" role="status">' + escapeHtml(actionMessage()) +
-    "</p></div></footer>" + (session.dialog ? controlDialog() : "") + "</div>";
+    '</div>' + controlActions(locked) + '</div>' + (session.dialog ? controlDialog() : "") + "</section>";
+}
+
+function controlActions(locked) {
+  const actions = activeActions();
+  const expanded = session.actionsExpanded;
+  const content = actions.map(action => {
+    const active = session.running?.action.id === action.id;
+    const disabled = locked || (session.running && !active);
+    return '<button type="button" class="action-tile" data-action="run" data-value="' + escapeHtml(action.id) +
+      '" aria-pressed="' + Boolean(active) + '"' + (disabled ? " disabled" : "") + '><span aria-hidden="true">' +
+      escapeHtml(action.icon) + "</span>" + escapeHtml(action.label) + "</button>";
+  }).join("") + (session.agent === "teach" ? button(tr("打开示教", "Open teaching"), "begin-teach", "", { disabled: locked }) : "") +
+    (session.agent === "talk" ? button(tr("模拟对话", "Simulated conversation"), "open-chat", "", { disabled: locked }) : "");
+  return '<footer class="action-panel' + (expanded ? " expanded" : "") + '"><div class="action-panel-top"><button type="button" class="panel-toggle" data-action="toggle-actions" aria-controls="control-actions" aria-expanded="' +
+    expanded + '" aria-label="' + (expanded ? tr("收起动作", "Collapse actions") : tr("展开动作", "Expand actions")) + '">' +
+    tr("动作", "Actions") + '<span aria-hidden="true">' + (expanded ? "⌄" : "⌃") + '</span></button>' +
+    '<p class="caption" id="action-output" role="status">' + escapeHtml(actionMessage()) + '</p></div>' +
+    '<div class="action-grid" id="control-actions"' + (expanded ? "" : " hidden") + '>' + content + "</div></footer>";
 }
 
 function actionMessage() {
@@ -424,21 +453,53 @@ function actionMessage() {
   if (run) return run.action.label + " · " + (run.remaining > run.action.duration ?
     tr("准备中", "Preparing") : tr("执行中", "Running") + " " + run.remaining + " s");
   if (!connected()) return tr("连接恢复后，请重新选择操作。", "Choose a new action after reconnecting.");
-  if (session.mode === "damp") return tr("点「准备」，再点「行走」启用摇杆和动作。", "Tap Ready, then Walking to enable joysticks and actions.");
-  if (session.mode === "ready") return tr("确认机器人已站稳后，点「行走」。", "Confirm the robot is standing, then tap Walking.");
-  return tr("点击动作执行。", "Select an action to run.");
+  if (robotStopped()) return tr("已急停 · 操作锁定", "Stopped · Controls locked");
+  if (session.mode === "damp") return tr("阻尼模式 · 先进入准备", "Damping · Select Ready first");
+  if (session.mode === "ready") return tr("准备模式 · 站稳后进入行走", "Ready · Select Walking once stable");
+  return tr("行走模式 · 可操控并执行动作", "Walking · Controls and actions available");
 }
 
-function changeMode(mode) {
-  if (!connected() || !modes.includes(mode) || (mode === "walk" && session.mode === "damp")) return;
+function askMode(mode) {
+  if (!connected() || robotStopped() || session.running || mode === session.mode) return;
+  if (mode === "ready" || (mode === "walk" && session.mode === "ready")) openControlDialog("mode-" + mode);
+}
+
+function confirmMode(slider) {
+  const mode = slider.dataset.mode;
+  if (Number(slider.value) !== 100 || !connected() || robotStopped() || session.dialog !== "mode-" + mode) return;
+  if (mode !== "ready" && !(mode === "walk" && session.mode === "ready")) return;
   stopAction();
   clearInputs();
   session.mode = mode;
+  session.dialog = "";
   render();
 }
 
+function emergency(value) {
+  if (!connected()) return;
+  if (value === "release") {
+    if (robotStopped()) openControlDialog("stop-release");
+    return;
+  }
+  session.stoppedRobots.add(session.connection.id);
+  stopAction();
+  clearInputs();
+  session.mode = "damp";
+  render();
+  toast(tr("模拟急停已触发", "Simulated stop engaged"));
+}
+
+function releaseStop() {
+  if (!connected() || !robotStopped() || session.dialog !== "stop-release") return;
+  session.stoppedRobots.delete(session.connection.id);
+  session.mode = "damp";
+  session.dialog = "";
+  render();
+  toast(tr("已解除急停，请重新进入准备模式", "Stop released. Select Ready again."));
+}
+
 function runAction(id) {
-  if (!connected() || session.mode !== "walk") return;
+  if (!connected() || robotStopped() || session.dialog) return;
   if (session.running) {
     if (session.running.action.id === id && session.running.action.cancel) {
       stopAction();
@@ -498,7 +559,7 @@ function stickInput(event, stick) {
   const bounds = stick.getBoundingClientRect();
   const max = bounds.width * 0.35;
   const x = event.clientX - bounds.left - bounds.width / 2;
-  const y = event.clientY - bounds.top - bounds.height / 2;
+  const y = stick.dataset.stick === "turn" ? 0 : event.clientY - bounds.top - bounds.height / 2;
   const factor = Math.max(1, Math.hypot(x, y) / max);
   session.motion[stick.dataset.stick] = { x: x / factor / max, y: y / factor / max };
   stick.style.setProperty("--stick-x", x / factor + "px");
@@ -507,6 +568,13 @@ function stickInput(event, stick) {
 }
 
 root.addEventListener("pointerdown", event => {
+  const slider = event.target.closest(".confirm-slider");
+  if (slider) {
+    const bounds = slider.getBoundingClientRect();
+    const handle = 18 + Number(slider.value) / 100 * (bounds.width - 36);
+    if (Math.abs(event.clientX - bounds.left - handle) > 27) event.preventDefault();
+    return;
+  }
   const stick = event.target.closest("[data-stick]");
   if (!stick || stick.disabled || stick.dataset.pointer) return;
   stick.dataset.pointer = String(event.pointerId);
@@ -528,6 +596,9 @@ for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
     updateMotion();
   });
 }
+root.addEventListener("pointercancel", event => {
+  if (event.target.matches(".confirm-slider")) event.target.value = "0";
+});
 const keyboardDirections = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 root.addEventListener("keydown", event => {
   const stick = event.target.closest("[data-stick]");
@@ -535,6 +606,7 @@ root.addEventListener("keydown", event => {
   if (!stick || stick.disabled || !direction || stick.dataset.pointer) return;
   event.preventDefault();
   const [x, y] = direction;
+  if (stick.dataset.stick === "turn" && y) return;
   session.motion[stick.dataset.stick] = { x, y };
   stick.style.setProperty("--stick-x", x * 18 + "px");
   stick.style.setProperty("--stick-y", y * 18 + "px");
@@ -558,11 +630,30 @@ function controlDialog() {
   const agent = getAgent();
   let body;
   const picker = session.dialog === "agents";
+  const mode = session.dialog.startsWith("mode-") ? session.dialog.slice(5) : "";
+  let title = agentLabel(agent);
   if (picker) {
-    body = '<div class="stack">' + catalog.agents.filter(item => installed(robot, item) && compatible(item, robot)).map(item =>
-      tile(item.icon, agentLabel(item), tr(...item.description), "switch-agent", { value: item.id, tone: item.tone })
-    ).join("") + '<div class="row">' + button(tr("当前 Agent 设置", "Current Agent settings"), "agent-settings") +
-      button(tr("管理 Agent", "Manage Agents"), "nav", "", { value: "store" }) + "</div></div>";
+    title = tr("切换 Agent", "Switch Agent");
+    body = '<div class="agent-grid">' + catalog.agents.filter(item => installed(robot, item) && compatible(item, robot)).map(item =>
+      '<button type="button" class="agent-tile" data-action="switch-agent" data-value="' + item.id + '" aria-pressed="' +
+      (item.id === agent.id) + '"><span class="symbol ' + item.tone + '" aria-hidden="true">' + item.icon +
+      "</span><strong>" + agentLabel(item) + "</strong><small>" + tr(...item.description) + "</small></button>"
+    ).join("") + '</div><div class="row">' + button(tr("当前 Agent 设置", "Current Agent settings"), "agent-settings") +
+      button(tr("管理 Agent", "Manage Agents"), "nav", "", { value: "store" }) + "</div>";
+  } else if (mode) {
+    const isWalk = mode === "walk";
+    title = isWalk ? tr("确认行走模式", "Confirm Walking") : tr("确认准备模式", "Confirm Ready");
+    const message = isWalk ?
+      tr("确认模拟机器人已落地站稳。完成确认后，行走和转身摇杆将启用。", "Confirm the simulated robot is standing stably. Walking and turning will then be enabled.") :
+      tr("准备模式下，模拟机器人将伸直身体。", "In Ready mode, the simulated robot straightens its body.");
+    const hint = tr("向右滑动确认", "Slide right to confirm");
+    body = '<div class="mode-confirm"><p>' + message + '</p><label class="confirm-track"><span>' + hint +
+      '</span><input class="confirm-slider" name="confirm-mode" data-mode="' + mode +
+      '" type="range" min="0" max="100" value="0" aria-label="' + hint + '"></label></div>';
+  } else if (session.dialog === "stop-release") {
+    title = tr("解除模拟急停", "Release simulated stop");
+    body = '<p>' + tr("解除后回到阻尼模式，请重新选择准备。此前的运动和动作保持停止。", "Returns to Damping. Select Ready again. Previous movement and actions stay stopped.") +
+      '</p><div>' + button(tr("确认解除", "Confirm release"), "release-stop", "primary") + "</div>";
   } else if (session.dialog === "chat") {
     body = '<form class="form" data-form="chat"><label class="field">' +
       tr("给对话伙伴发送问候", "Send a greeting to your companion") +
@@ -578,9 +669,10 @@ function controlDialog() {
       (level === "slow" ? " selected" : "") + ">" + (agent.id === "talk" ? tr("语言教练", "Language coach") : tr("慢速", "Slow")) +
       "</option></select></label>" + button(tr("保存设置", "Save settings"), "preference-submit", "primary", { type: "submit" }) + "</form>";
   }
-  return '<div class="overlay"><section class="panel" role="dialog" data-dialog="' + session.dialog +
+  return '<div class="overlay' + (picker ? " agent-overlay" : "") + '"><section class="panel' +
+    (picker ? " agent-panel" : "") + '" role="dialog" data-dialog="' + session.dialog +
     '" aria-modal="true" aria-labelledby="dialog-title"><div class="row-between">' +
-    '<h2 id="dialog-title">' + (picker ? tr("切换 Agent", "Switch Agent") : agentLabel(agent)) + "</h2>" +
+    '<h2 id="dialog-title">' + title + "</h2>" +
     button(tr("关闭", "Close"), "close-dialog") + "</div>" + body + "</section></div>";
 }
 
@@ -653,7 +745,7 @@ function settings() {
     chip(robot.model) + chip("FW " + robot.firmware) + chip(tr("电量 ", "Battery ") + robot.battery + "%") +
     '</div><div class="row">' + button(session.camera ? tr("关闭图传", "Disable camera feed") : tr("开启图传", "Enable camera feed"), "camera", "", { disabled: !online }) +
     button(tr("检查更新", "Check for updates"), "device-update", "", { disabled: Boolean(session.update) }) +
-    (robot.model === "K1" ? button(tr("手眼标定", "Hand–eye calibration"), "start-calibration", "", { disabled: !online }) : "") +
+    (robot.model === "K1" ? button(tr("手眼标定", "Hand–eye calibration"), "start-calibration", "", { disabled: !online || robotStopped() }) : "") +
     '</div>' + updateStatus() + (result ? '<p class="caption">' + tr("已保存模拟标定结果", "Simulated calibration saved") +
     " · " + result.size + " mm</p>" : "") + '</section><section class="card stack"><h3>' +
     tr("连接诊断", "Connection diagnostics") + '</h3><div class="row">' +
@@ -761,6 +853,7 @@ function startGroup() {
 
 function groupChecks(ids) {
   if (ids.length < 2 || ids.length > 10) return tr("请选择 2–10 台设备。", "Select 2–10 robots.");
+  if (ids.some(id => session.stoppedRobots.has(id))) return tr("有设备已急停，请解除后再组队。", "Release stopped robots before grouping.");
   const units = ids.map(robotById);
   const same = units.every(unit => unit.model === units[0].model && unit.firmware === units[0].firmware);
   if (!same) return tr("机型和固件版本须一致。", "Robot models and firmware versions must match.");
@@ -895,7 +988,7 @@ function startGroupAction(id) {
 
 function startCalibration() {
   const robot = currentRobot();
-  if (!connected() || robot.model !== "K1") return;
+  if (!connected() || robotStopped() || robot.model !== "K1") return;
   session.calibration = { step: "setup", size: saved.calibration[robot.id]?.size || 20, aligned: false, stage: 0 };
   route("calibration");
 }
@@ -1055,8 +1148,15 @@ const actions = {
     route("home");
     toast(tr("模拟连接已断开", "Demo robot disconnected"));
   },
-  mode: changeMode,
+  mode: askMode,
   run: runAction,
+  emergency,
+  "release-stop": releaseStop,
+  "toggle-actions": () => {
+    clearInputs();
+    session.actionsExpanded = !session.actionsExpanded;
+    render();
+  },
   camera: toggleCamera,
   "agent-picker": () => openControlDialog("agents"),
   "agent-settings": () => openControlDialog("settings"),
@@ -1289,6 +1389,10 @@ root.addEventListener("input", event => {
   if (session.page === "calibration" && name === "aligned") session.calibration.aligned = event.target.checked;
 });
 root.addEventListener("change", event => {
+  if (event.target.name === "confirm-mode") {
+    confirmMode(event.target);
+    return;
+  }
   if (session.page === "connect" && event.target.name === "network") {
     session.join.network = event.target.value;
     render();
